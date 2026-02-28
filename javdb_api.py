@@ -193,6 +193,7 @@ class JavdbAPI:
         
         title = self._extract_title(soup)
         code = self._extract_code(soup)
+        date = self._extract_date(soup)
         tags = self._extract_tags(soup)
         series = self._extract_series(soup)
         actors = self._extract_actors(soup)
@@ -204,6 +205,7 @@ class JavdbAPI:
             'video_id': video_id,
             'title': title,
             'code': code,
+            'date': date,
             'tags': tags,
             'series': series,
             'actors': actors,
@@ -303,6 +305,18 @@ class JavdbAPI:
                 series_link = section.select_one('a')
                 if series_link:
                     return series_link.get_text(strip=True)
+        return ""
+    
+    def _extract_date(self, soup: BeautifulSoup) -> str:
+        """提取日期"""
+        tag_sections = soup.select('.panel-block')
+        for section in tag_sections:
+            strong_elem = section.select_one('strong')
+            if strong_elem and '日期' in strong_elem.get_text():
+                date_text = section.get_text(strip=True)
+                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', date_text)
+                if date_match:
+                    return date_match.group(1)
         return ""
     
     def _extract_actors(self, soup: BeautifulSoup) -> List[str]:
@@ -433,9 +447,9 @@ class JavdbAPI:
                     continue
                 
                 actors.append({
-                    'name': matched_name,
+                    'actor_name': matched_name,
                     'actor_id': actor_id,
-                    'url': urljoin(self.base_url, href),
+                    'actor_url': urljoin(self.base_url, href),
                 })
             except:
                 continue

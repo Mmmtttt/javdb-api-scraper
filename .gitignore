@@ -41,6 +41,9 @@ config.py
 output/
 !output/.gitkeep
 
+# Test output
+test/output/
+
 # Keep example config
 !config.example.py
 

@@ -22,10 +22,12 @@ javdb-api-scraper/
 ├── login.py               # 自动登录模块
 ├── utils.py               # 工具函数
 ├── parse_tags_html.py     # 标签数据库解析脚本
-├── test_all_apis.py       # API 测试脚本
-├── test_tags_final.py     # 标签功能测试
 ├── requirements.txt       # 依赖列表
 ├── cookies.json           # 登录 cookies
+├── test/                  # 测试目录
+│   ├── verify_api.py      # API 验证测试
+│   ├── test_all_apis.py   # API 测试脚本
+│   └── test_tags_final.py # 标签功能测试
 └── output/
     ├── tags_database.json # 标签数据库
     ├── json/              # JSON 数据输出
