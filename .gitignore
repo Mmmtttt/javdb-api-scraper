@@ -40,6 +40,7 @@ config.py
 # Output data
 output/
 !output/.gitkeep
+!output/tags_database.enc
 
 # Test output
 test/output/

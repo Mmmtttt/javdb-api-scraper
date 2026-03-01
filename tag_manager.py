@@ -26,6 +26,13 @@ from bs4 import BeautifulSoup
 
 import config
 
+# 导入加密工具
+try:
+    from crypto_utils import CryptoUtils, DEFAULT_KEY
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
 
 # 尝试导入登录模块
 try:
@@ -50,7 +57,7 @@ class TagManager:
         self.session = requests.Session()
         self.session.headers.update(config.HEADERS)
         self.tags_db: Dict = {}
-        self.db_path = Path(config.OUTPUT_DIR['root']) / 'tags_database.json'
+        self.db_path = Path(config.OUTPUT_DIR['root']) / 'tags_database.enc'  # 使用加密文件
     
     def fetch_tags(self, force_update: bool = False, auto_login: bool = True) -> Dict:
         """
@@ -161,7 +168,7 @@ class TagManager:
     
     def save_tags(self, tags_db: Dict = None):
         """
-        保存标签数据库到 JSON 文件
+        保存标签数据库到加密文件
         
         Args:
             tags_db: 标签数据库，如果为 None 使用当前缓存的数据
@@ -170,20 +177,46 @@ class TagManager:
             tags_db = self.tags_db
         
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.db_path, 'w', encoding='utf-8') as f:
-            json.dump(tags_db, f, indent=2, ensure_ascii=False)
+        
+        if HAS_CRYPTO:
+            # 使用加密保存
+            json_str = json.dumps(tags_db, indent=2, ensure_ascii=False)
+            encrypted = CryptoUtils.xor_encrypt(json_str, DEFAULT_KEY)
+            with open(self.db_path, 'w', encoding='utf-8') as f:
+                f.write(encrypted)
+        else:
+            # 降级到明文保存
+            with open(self.db_path, 'w', encoding='utf-8') as f:
+                json.dump(tags_db, f, indent=2, ensure_ascii=False)
     
     def load_tags(self) -> Dict:
         """
-        从 JSON 文件加载标签数据库
+        从加密文件加载标签数据库
         
         Returns:
             标签数据库字典
         """
         if self.db_path.exists():
-            with open(self.db_path, 'r', encoding='utf-8') as f:
-                self.tags_db = json.load(f)
+            try:
+                if HAS_CRYPTO:
+                    # 尝试解密加载
+                    with open(self.db_path, 'r', encoding='utf-8') as f:
+                        encrypted_content = f.read()
+                    decrypted_str = CryptoUtils.xor_decrypt(encrypted_content, DEFAULT_KEY)
+                    self.tags_db = json.loads(decrypted_str)
+                else:
+                    # 尝试明文加载
+                    with open(self.db_path, 'r', encoding='utf-8') as f:
+                        self.tags_db = json.load(f)
                 return self.tags_db
+            except Exception as e:
+                # 如果解密失败，尝试明文加载（向后兼容）
+                try:
+                    with open(self.db_path, 'r', encoding='utf-8') as f:
+                        self.tags_db = json.load(f)
+                    return self.tags_db
+                except:
+                    return {}
         return {}
     
     def get_tag_info(self, category: str, tag_id) -> Optional[Dict]:
