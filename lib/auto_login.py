@@ -254,7 +254,13 @@ WxfOVU11nGDFZ79PnSUnPdkhvwY7ptpqqsm1lrlKO%2F2yuTDVmCno%2FOtDT8FC%2BoiFT2IXNobjsS
                 self.send_response(404)
                 self.end_headers()
         
-        elif self.path == '/save-cookies':
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def do_POST(self):
+        """处理 POST 请求"""
+        if self.path == '/save-cookies':
             # 保存 cookies
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)

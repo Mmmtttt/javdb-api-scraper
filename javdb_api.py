@@ -334,7 +334,7 @@ class JavdbAPI:
         response = self.get(url)
         soup = BeautifulSoup(response.text, 'lxml')
         
-        items = soup.select('div.item a.box')
+        items = soup.select('div.item a')
         if not items:
             return None
         
@@ -587,7 +587,7 @@ class JavdbAPI:
         soup = BeautifulSoup(response.text, 'lxml')
         
         works = []
-        items = soup.select('div.item a.box')
+        items = soup.select('div.item a')
         
         for item in items:
             try:
@@ -821,7 +821,6 @@ class JavdbAPI:
     def _parse_work_item(self, item) -> Optional[Dict]:
         """解析作品项"""
         try:
-            title = item.get('title', '')
             href = item.get('href', '')
             
             match = re.search(r'/v/([a-zA-Z0-9]+)', href)
@@ -831,12 +830,14 @@ class JavdbAPI:
             video_id = match.group(1)
             
             code = ""
-            code_elem = item.select_one('.video-title')
-            if code_elem:
-                code_text = code_elem.get_text(strip=True)
-                code_match = re.search(r'([A-Z]{2,6}-?\d{2,5})', code_text, re.I)
+            title = ""
+            video_title_elem = item.select_one('.video-title')
+            if video_title_elem:
+                video_title_text = video_title_elem.get_text(strip=True)
+                code_match = re.search(r'(FC2(?:-?PPV)?-?\d+|[A-Z]{2,6}-?\d{2,5})', video_title_text, re.I)
                 if code_match:
                     code = code_match.group(1).upper()
+                title = video_title_text
             
             date = ""
             meta_elem = item.select_one('.meta')
@@ -898,7 +899,7 @@ class JavdbAPI:
         soup = BeautifulSoup(response.text, 'lxml')
         
         works = []
-        items = soup.select('div.item a.box')
+        items = soup.select('div.item a')
         
         for item in items:
             try:
@@ -1068,7 +1069,7 @@ class JavdbAPI:
         soup = BeautifulSoup(response.text, 'lxml')
         
         works = []
-        items = soup.select('div.item a.box')
+        items = soup.select('div.item a')
         
         for item in items:
             try:
@@ -1165,7 +1166,7 @@ class JavdbAPI:
         soup = BeautifulSoup(response.text, 'lxml')
         
         videos = []
-        items = soup.select('div.item a.box')
+        items = soup.select('div.item a')
         
         for item in items:
             try:
@@ -1215,6 +1216,360 @@ class JavdbAPI:
         self.magnet_exporter.save_magnets(works, f"{actor_name}_magnets.txt")
         
         return export_data
+    
+    # ==================== 用户清单功能 ====================
+    
+    def get_want_watch_videos(self, page: int = 1) -> Dict:
+        """
+        获取用户的想看清单
+        
+        Args:
+            page: 页码（从1开始）
+            
+        Returns:
+            {
+                'page': 1,
+                'has_next': True,
+                'works': [
+                    {
+                        'video_id': 'YwG8Ve',
+                        'code': 'MIDA-583',
+                        'title': '作品标题',
+                        'date': '2026-03-04',
+                        'rating': '4.57分',
+                        'url': 'https://javdb.com/v/YwG8Ve'
+                    },
+                    ...
+                ]
+            }
+        """
+        url = f"/users/want_watch_videos"
+        if page > 1:
+            url = f"/users/want_watch_videos?page={page}"
+        
+        response = self.get(url)
+        soup = BeautifulSoup(response.text, 'lxml')
+        
+        works = []
+        items = soup.select('div.item a')
+        
+        for item in items:
+            try:
+                work = self._parse_work_item(item)
+                if work:
+                    works.append(work)
+            except:
+                continue
+        
+        next_btn = soup.select_one('nav.pagination a[rel="next"]')
+        has_next = next_btn is not None
+        
+        return {
+            'page': page,
+            'has_next': has_next,
+            'works': works,
+        }
+    
+    def get_watched_videos(self, page: int = 1) -> Dict:
+        """
+        获取用户的看过清单
+        
+        Args:
+            page: 页码（从1开始）
+            
+        Returns:
+            {
+                'page': 1,
+                'has_next': True,
+                'works': [
+                    {
+                        'video_id': 'YwG8Ve',
+                        'code': 'MIDA-583',
+                        'title': '作品标题',
+                        'date': '2026-03-04',
+                        'rating': '4.57分',
+                        'url': 'https://javdb.com/v/YwG8Ve'
+                    },
+                    ...
+                ]
+            }
+        """
+        url = f"/users/watched_videos"
+        if page > 1:
+            url = f"/users/watched_videos?page={page}"
+        
+        response = self.get(url)
+        soup = BeautifulSoup(response.text, 'lxml')
+        
+        works = []
+        items = soup.select('div.item a')
+        
+        for item in items:
+            try:
+                work = self._parse_work_item(item)
+                if work:
+                    works.append(work)
+            except:
+                continue
+        
+        next_btn = soup.select_one('nav.pagination a[rel="next"]')
+        has_next = next_btn is not None
+        
+        return {
+            'page': page,
+            'has_next': has_next,
+            'works': works,
+        }
+    
+    def get_user_lists(self, page: int = 1) -> Dict:
+        """
+        获取用户的清单列表（分页）
+        
+        Args:
+            page: 页码（从1开始）
+        
+        Returns:
+            {
+                'page': 1,
+                'has_next': True,
+                'lists': [
+                    {
+                        'list_id': '0W97k',
+                        'list_name': '我的收藏',
+                        'list_url': 'https://javdb.com/users/list_detail?id=0W97k',
+                        'video_count': 50
+                    },
+                    ...
+                ]
+            }
+        """
+        url = f"/users/lists"
+        if page > 1:
+            url = f"/users/lists?page={page}"
+        
+        response = self.get(url)
+        soup = BeautifulSoup(response.text, 'lxml')
+        
+        lists = []
+        list_items = soup.select('li.list-item')
+        
+        for item in list_items:
+            try:
+                link = item.select_one('a[href*="list_detail"]')
+                if not link:
+                    continue
+                
+                href = link.get('href', '')
+                list_id = href.split('id=')[-1] if 'id=' in href else ''
+                
+                name_elem = item.select_one('.list-name')
+                list_name = name_elem.get_text(strip=True) if name_elem else ''
+                
+                meta_elem = item.select_one('.meta')
+                video_count = 0
+                if meta_elem:
+                    meta_text = meta_elem.get_text(strip=True)
+                    count_match = re.search(r'(\d+)\s*部影片', meta_text)
+                    if count_match:
+                        video_count = int(count_match.group(1))
+                
+                lists.append({
+                    'list_id': list_id,
+                    'list_name': list_name,
+                    'list_url': f"{self.base_url}{href}",
+                    'video_count': video_count
+                })
+            except:
+                continue
+        
+        next_btn = soup.select_one('nav.pagination a[rel="next"]')
+        has_next = next_btn is not None
+        
+        return {
+            'page': page,
+            'has_next': has_next,
+            'lists': lists,
+        }
+    
+    def get_user_lists_all(self, max_pages: int = 100) -> List[Dict]:
+        """
+        获取用户的所有清单（自动翻页）
+        
+        Args:
+            max_pages: 最大页数限制
+            
+        Returns:
+            [
+                {
+                    'list_id': '0W97k',
+                    'list_name': '我的收藏',
+                    'list_url': 'https://javdb.com/users/list_detail?id=0W97k',
+                    'video_count': 50
+                },
+                ...
+            ]
+        """
+        all_lists = []
+        page = 1
+        
+        while page <= max_pages:
+            result = self.get_user_lists(page=page)
+            all_lists.extend(result['lists'])
+            
+            if not result['has_next']:
+                break
+            
+            page += 1
+        
+        return all_lists
+    
+    def get_list_detail(self, list_id: str, page: int = 1) -> Dict:
+        """
+        获取清单的详细内容
+        
+        Args:
+            list_id: 清单ID（如 "0W97k"）
+            page: 页码（从1开始）
+            
+        Returns:
+            {
+                'page': 1,
+                'has_next': True,
+                'list_id': '0W97k',
+                'list_name': '我的收藏',
+                'works': [
+                    {
+                        'video_id': 'YwG8Ve',
+                        'code': 'MIDA-583',
+                        'title': '作品标题',
+                        'date': '2026-03-04',
+                        'rating': '4.57分',
+                        'url': 'https://javdb.com/v/YwG8Ve'
+                    },
+                    ...
+                ]
+            }
+        """
+        url = f"/users/list_detail?id={list_id}"
+        if page > 1:
+            url = f"/users/list_detail?id={list_id}&page={page}"
+        
+        response = self.get(url)
+        soup = BeautifulSoup(response.text, 'lxml')
+        
+        list_name = ''
+        breadcrumb_active = soup.select_one('nav.breadcrumb li.is-active a')
+        if breadcrumb_active:
+            list_name = breadcrumb_active.get_text(strip=True)
+        
+        works = []
+        items = soup.select('div.item a')
+        
+        for item in items:
+            try:
+                work = self._parse_work_item(item)
+                if work:
+                    works.append(work)
+            except:
+                continue
+        
+        next_btn = soup.select_one('nav.pagination a[rel="next"]')
+        has_next = next_btn is not None
+        
+        return {
+            'page': page,
+            'has_next': has_next,
+            'list_id': list_id,
+            'list_name': list_name,
+            'works': works,
+        }
+    
+    def get_want_watch_videos_all(self, max_pages: int = 100) -> List[Dict]:
+        """
+        获取用户想看清单的所有作品
+        
+        Args:
+            max_pages: 最大页数限制
+            
+        Returns:
+            作品列表
+        """
+        works = []
+        page = 1
+        has_next = True
+        
+        while has_next and page <= max_pages:
+            result = self.get_want_watch_videos(page)
+            works.extend(result['works'])
+            has_next = result['has_next']
+            
+            if has_next:
+                page += 1
+                time.sleep(config.JAVDB['sleep_time'])
+        
+        return works
+    
+    def get_watched_videos_all(self, max_pages: int = 100) -> List[Dict]:
+        """
+        获取用户看过清单的所有作品
+        
+        Args:
+            max_pages: 最大页数限制
+            
+        Returns:
+            作品列表
+        """
+        works = []
+        page = 1
+        has_next = True
+        
+        while has_next and page <= max_pages:
+            result = self.get_watched_videos(page)
+            works.extend(result['works'])
+            has_next = result['has_next']
+            
+            if has_next:
+                page += 1
+                time.sleep(config.JAVDB['sleep_time'])
+        
+        return works
+    
+    def get_list_detail_all(self, list_id: str, max_pages: int = 100) -> Dict:
+        """
+        获取清单的所有作品
+        
+        Args:
+            list_id: 清单ID
+            max_pages: 最大页数限制
+            
+        Returns:
+            {
+                'list_id': '0W97k',
+                'list_name': '我的收藏',
+                'works': [...]
+            }
+        """
+        works = []
+        page = 1
+        has_next = True
+        list_name = ''
+        
+        while has_next and page <= max_pages:
+            result = self.get_list_detail(list_id, page)
+            if page == 1:
+                list_name = result.get('list_name', '')
+            works.extend(result['works'])
+            has_next = result['has_next']
+            
+            if has_next:
+                page += 1
+                time.sleep(config.JAVDB['sleep_time'])
+        
+        return {
+            'list_id': list_id,
+            'list_name': list_name,
+            'works': works,
+        }
 
 
 # ==================== 便捷函数 ====================
@@ -1456,6 +1811,160 @@ def search_by_tags_full(page: int = 1, download_images: bool = False,
     """
     api = JavdbAPI()
     return api.search_by_tags_full(page, download_images, **tag_params)
+
+
+# ==================== 用户清单功能 ====================
+
+def get_want_watch_videos(page: int = 1) -> Dict:
+    """
+    获取用户的想看清单
+    
+    Args:
+        page: 页码（从1开始）
+        
+    Returns:
+        {
+            'page': 1,
+            'has_next': True,
+            'works': [...]
+        }
+    """
+    api = JavdbAPI()
+    return api.get_want_watch_videos(page)
+
+
+def get_watched_videos(page: int = 1) -> Dict:
+    """
+    获取用户的看过清单
+    
+    Args:
+        page: 页码（从1开始）
+        
+    Returns:
+        {
+            'page': 1,
+            'has_next': True,
+            'works': [...]
+        }
+    """
+    api = JavdbAPI()
+    return api.get_watched_videos(page)
+
+
+def get_user_lists(page: int = 1) -> Dict:
+    """
+    获取用户的清单列表（分页）
+    
+    Args:
+        page: 页码（从1开始）
+    
+    Returns:
+        {
+            'page': 1,
+            'has_next': True,
+            'lists': [
+                {
+                    'list_id': '0W97k',
+                    'list_name': '我的收藏',
+                    'list_url': 'https://javdb.com/users/list_detail?id=0W97k',
+                    'video_count': 50
+                },
+                ...
+            ]
+        }
+    """
+    api = JavdbAPI()
+    return api.get_user_lists(page)
+
+
+def get_user_lists_all(max_pages: int = 100) -> List[Dict]:
+    """
+    获取用户的所有清单（自动翻页）
+    
+    Args:
+        max_pages: 最大页数限制
+        
+    Returns:
+        [
+            {
+                'list_id': '0W97k',
+                'list_name': '我的收藏',
+                'list_url': 'https://javdb.com/users/list_detail?id=0W97k',
+                'video_count': 50
+            },
+            ...
+        ]
+    """
+    api = JavdbAPI()
+    return api.get_user_lists_all(max_pages)
+
+
+def get_list_detail(list_id: str, page: int = 1) -> Dict:
+    """
+    获取清单的详细内容
+    
+    Args:
+        list_id: 清单ID（如 "0W97k"）
+        page: 页码（从1开始）
+        
+    Returns:
+        {
+            'page': 1,
+            'has_next': True,
+            'list_id': '0W97k',
+            'list_name': '我的收藏',
+            'works': [...]
+        }
+    """
+    api = JavdbAPI()
+    return api.get_list_detail(list_id, page)
+
+
+def get_want_watch_videos_all(max_pages: int = 100) -> List[Dict]:
+    """
+    获取用户想看清单的所有作品
+    
+    Args:
+        max_pages: 最大页数限制
+        
+    Returns:
+        作品列表
+    """
+    api = JavdbAPI()
+    return api.get_want_watch_videos_all(max_pages)
+
+
+def get_watched_videos_all(max_pages: int = 100) -> List[Dict]:
+    """
+    获取用户看过清单的所有作品
+    
+    Args:
+        max_pages: 最大页数限制
+        
+    Returns:
+        作品列表
+    """
+    api = JavdbAPI()
+    return api.get_watched_videos_all(max_pages)
+
+
+def get_list_detail_all(list_id: str, max_pages: int = 100) -> Dict:
+    """
+    获取清单的所有作品
+    
+    Args:
+        list_id: 清单ID
+        max_pages: 最大页数限制
+        
+    Returns:
+        {
+            'list_id': '0W97k',
+            'list_name': '我的收藏',
+            'works': [...]
+        }
+    """
+    api = JavdbAPI()
+    return api.get_list_detail_all(list_id, max_pages)
 
 
 # ==================== 标签管理模块导出 ====================

@@ -49,6 +49,18 @@ from .external_api import (
     get_adapter,
 )
 
+# 用户清单功能
+from javdb_api import (
+    get_want_watch_videos,
+    get_watched_videos,
+    get_user_lists,
+    get_list_detail,
+    get_want_watch_videos_all,
+    get_watched_videos_all,
+    get_list_detail_all,
+    get_user_lists_all,
+)
+
 # 工具类
 from .crypto_utils import CryptoUtils, DEFAULT_KEY
 from .login import JavdbLogin, login, ensure_login
@@ -78,6 +90,15 @@ __all__ = [
     'get_supported_platforms',
     'set_default_platform',
     'get_adapter',
+    # 用户清单功能
+    'get_want_watch_videos',
+    'get_watched_videos',
+    'get_user_lists',
+    'get_list_detail',
+    'get_want_watch_videos_all',
+    'get_watched_videos_all',
+    'get_list_detail_all',
+    'get_user_lists_all',
     # 工具类
     'CryptoUtils',
     'DEFAULT_KEY',

@@ -37,6 +37,14 @@ from javdb_api import (
     get_tag_by_id,
     search_tags_by_keyword,
     convert_to_traditional,
+    get_want_watch_videos,
+    get_watched_videos,
+    get_user_lists,
+    get_list_detail,
+    get_want_watch_videos_all,
+    get_watched_videos_all,
+    get_list_detail_all,
+    get_user_lists_all,
 )
 # from tag_manager import (  # 标签管理功能已移至 lib
 #     get_tag_info,
@@ -269,6 +277,42 @@ TAG_MANAGER_TESTS = [
     {
         "name": "测试标签关键词搜索",
         "keyword": "女",
+        "enabled": True,
+    },
+]
+
+# 用户清单测试配置
+USER_LIST_TESTS = [
+    {
+        "name": "测试获取想看清单",
+        "test_type": "want_watch",
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试获取看过清单（全部作品ID）",
+        "test_type": "watched_all",
+        "max_pages": 5,
+        "enabled": True,
+    },
+    {
+        "name": "测试获取用户清单列表（全部）",
+        "test_type": "user_lists_all",
+        "max_pages": 5,
+        "enabled": True,
+    },
+    {
+        "name": "测试获取清单详细内容",
+        "test_type": "list_detail",
+        "list_id": "0W97k",
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试获取清单全部作品ID",
+        "test_type": "list_detail_all",
+        "list_id": "0W97k",
+        "max_pages": 5,
         "enabled": True,
     },
 ]
@@ -869,6 +913,11 @@ def main():
         if test.get("enabled", False):
             all_tests.append(("标签管理", test, run_tag_manager_test))
     
+    # 用户清单测试
+    for test in USER_LIST_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("用户清单", test, run_user_list_test))
+    
     print(f"启用的测试项: {len(all_tests)} 个")
     print("=" * 70)
     
@@ -1319,6 +1368,116 @@ def run_tag_manager_test(config: dict):
             
     except Exception as e:
         log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_user_list_test(config: dict):
+    """运行用户清单测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        test_type = config.get("test_type")
+        
+        # 测试1: 获取想看清单
+        if test_type == "want_watch":
+            result = get_want_watch_videos(page=1)
+            
+            codes = [work['code'] for work in result['works'] if work['code']]
+            data = {
+                "page": result['page'],
+                "has_next": result['has_next'],
+                "total_works": len(result['works']),
+                "codes": codes[:10],
+                "all_codes_count": len(codes),
+            }
+            log_test(config["name"], True, 
+                    f"获取到 {len(result['works'])} 个作品，{len(codes)} 个有番号", data)
+        
+        # 测试2: 获取看过清单（全部）
+        elif test_type == "watched_all":
+            max_pages = config.get("max_pages", 5)
+            works = get_watched_videos_all(max_pages=max_pages)
+            
+            codes = [work['code'] for work in works if work['code']]
+            video_ids = [work['video_id'] for work in works]
+            
+            data = {
+                "max_pages": max_pages,
+                "total_works": len(works),
+                "codes_count": len(codes),
+                "video_ids_count": len(video_ids),
+                "sample_codes": codes[:20],
+                "sample_video_ids": video_ids[:20],
+            }
+            log_test(config["name"], True, 
+                    f"获取到 {len(works)} 个作品，{len(codes)} 个有番号", data)
+        
+        # 测试3: 获取用户清单列表（全部）
+        elif test_type == "user_lists_all":
+            max_pages = config.get("max_pages", 5)
+            lists = get_user_lists_all(max_pages=max_pages)
+            
+            data = {
+                "max_pages": max_pages,
+                "total_lists": len(lists),
+                "lists": [
+                    {
+                        "list_name": lst['list_name'],
+                        "list_id": lst['list_id'],
+                        "video_count": lst['video_count'],
+                    }
+                    for lst in lists
+                ],
+            }
+            log_test(config["name"], True, 
+                    f"获取到 {len(lists)} 个清单", data)
+        
+        # 测试4: 获取清单详细内容（单页）
+        elif test_type == "list_detail":
+            list_id = config.get("list_id", "0W97k")
+            result = get_list_detail(list_id, page=1)
+            
+            codes = [work['code'] for work in result['works'] if work['code']]
+            data = {
+                "list_id": list_id,
+                "list_name": result.get('list_name', ''),
+                "page": result['page'],
+                "has_next": result['has_next'],
+                "total_works": len(result['works']),
+                "codes": codes[:10],
+            }
+            log_test(config["name"], True, 
+                    f"清单 '{result.get('list_name')}' 获取到 {len(result['works'])} 个作品", data)
+        
+        # 测试5: 获取清单全部作品ID
+        elif test_type == "list_detail_all":
+            list_id = config.get("list_id", "0W97k")
+            max_pages = config.get("max_pages", 5)
+            result = get_list_detail_all(list_id, max_pages=max_pages)
+            
+            codes = [work['code'] for work in result['works'] if work['code']]
+            video_ids = [work['video_id'] for work in result['works']]
+            
+            data = {
+                "list_id": list_id,
+                "list_name": result.get('list_name', ''),
+                "max_pages": max_pages,
+                "total_works": len(result['works']),
+                "codes_count": len(codes),
+                "video_ids_count": len(video_ids),
+                "sample_codes": codes[:20],
+                "sample_video_ids": video_ids[:20],
+            }
+            log_test(config["name"], True, 
+                    f"清单 '{result.get('list_name')}' 获取到 {len(result['works'])} 个作品，{len(codes)} 个有番号", data)
+        
+        else:
+            log_test(config["name"], False, f"未知的测试类型: {test_type}")
+            
+    except Exception as e:
+        import traceback
+        log_test(config["name"], False, f"异常: {str(e)}\n{traceback.format_exc()}")
 
 
 if __name__ == "__main__":

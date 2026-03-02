@@ -7,9 +7,10 @@
 1. [快速开始](#快速开始)
 2. [核心 API 函数](#核心-api-函数)
 3. [标签搜索系统](#标签搜索系统)
-4. [数据格式详解](#数据格式详解)
-5. [高级功能](#高级功能)
-6. [错误处理](#错误处理)
+4. [用户清单功能](#用户清单功能)
+5. [数据格式详解](#数据格式详解)
+6. [高级功能](#高级功能)
+7. [错误处理](#错误处理)
 
 ---
 
@@ -498,6 +499,277 @@ result = api.get_actor_works_with_tags(
     "tag_id": 23,             # 标签数字ID
     "value": "23"             # 标签值
 }
+```
+
+---
+
+## 用户清单功能
+
+### 1. 获取想看清单
+
+#### `get_want_watch_videos(page=1)`
+
+获取用户的想看清单。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | int | 否 | 页码，默认1 |
+
+**返回:** 作品列表和分页信息
+
+```python
+{
+    "page": 1,
+    "has_next": True,
+    "works": [
+        {
+            "video_id": "YwG8Ve",
+            "code": "MIDA-583",
+            "title": "作品标题",
+            "date": "2026-03-04",
+            "rating": "4.57分",
+            "url": "https://javdb.com/v/YwG8Ve"
+        },
+        ...
+    ]
+}
+```
+
+**示例:**
+```python
+from lib import get_want_watch_videos
+
+# 获取第一页
+result = get_want_watch_videos(page=1)
+print(f"作品数: {len(result['works'])}")
+for work in result['works']:
+    print(f"{work['code']}: {work['title']}")
+```
+
+---
+
+### 2. 获取看过清单
+
+#### `get_watched_videos(page=1)`
+
+获取用户的看过清单。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | int | 否 | 页码，默认1 |
+
+**返回:** 作品列表和分页信息（格式同上）
+
+**示例:**
+```python
+from lib import get_watched_videos
+
+result = get_watched_videos(page=1)
+print(f"作品数: {len(result['works'])}")
+```
+
+---
+
+### 3. 获取用户清单列表
+
+#### `get_user_lists(page=1)`
+
+获取用户的清单列表（分页）。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | int | 否 | 页码，默认1 |
+
+**返回:** 清单列表和分页信息
+
+```python
+{
+    "page": 1,
+    "has_next": True,
+    "lists": [
+        {
+            "list_id": "0W97k",
+            "list_name": "我的收藏",
+            "list_url": "https://javdb.com/users/list_detail?id=0W97k",
+            "video_count": 50
+        },
+        ...
+    ]
+}
+```
+
+**示例:**
+```python
+from lib import get_user_lists
+
+result = get_user_lists(page=1)
+print(f"清单数: {len(result['lists'])}")
+for lst in result['lists']:
+    print(f"{lst['list_name']}: {lst['video_count']} 个作品")
+```
+
+---
+
+### 4. 获取清单详细内容
+
+#### `get_list_detail(list_id, page=1)`
+
+获取指定清单的作品列表。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| list_id | str | 是 | 清单ID，如 "0W97k" |
+| page | int | 否 | 页码，默认1 |
+
+**返回:** 清单详情和作品列表
+
+```python
+{
+    "page": 1,
+    "has_next": True,
+    "list_id": "0W97k",
+    "list_name": "我的收藏",
+    "works": [
+        {
+            "video_id": "YwG8Ve",
+            "code": "MIDA-583",
+            "title": "作品标题",
+            "date": "2026-03-04",
+            "rating": "4.57分",
+            "url": "https://javdb.com/v/YwG8Ve"
+        },
+        ...
+    ]
+}
+```
+
+**示例:**
+```python
+from lib import get_list_detail
+
+result = get_list_detail("0W97k", page=1)
+print(f"清单: {result['list_name']}")
+print(f"作品数: {len(result['works'])}")
+```
+
+---
+
+### 5. 获取所有想看作品
+
+#### `get_want_watch_videos_all(max_pages=100)`
+
+获取用户想看清单的所有作品（自动翻页）。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| max_pages | int | 否 | 最大页数限制，默认100 |
+
+**返回:** 作品列表
+
+**示例:**
+```python
+from lib import get_want_watch_videos_all
+
+works = get_want_watch_videos_all(max_pages=10)
+print(f"总共 {len(works)} 个作品")
+```
+
+---
+
+### 6. 获取所有看过作品
+
+#### `get_watched_videos_all(max_pages=100)`
+
+获取用户看过清单的所有作品（自动翻页）。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| max_pages | int | 否 | 最大页数限制，默认100 |
+
+**返回:** 作品列表
+
+**示例:**
+```python
+from lib import get_watched_videos_all
+
+works = get_watched_videos_all(max_pages=10)
+print(f"总共 {len(works)} 个作品")
+```
+
+---
+
+### 7. 获取清单所有作品
+
+#### `get_list_detail_all(list_id, max_pages=100)`
+
+获取指定清单的所有作品（自动翻页）。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| list_id | str | 是 | 清单ID |
+| max_pages | int | 否 | 最大页数限制，默认100 |
+
+**返回:** 清单详情和作品列表
+
+```python
+{
+    "list_id": "0W97k",
+    "list_name": "我的收藏",
+    "works": [...]
+}
+```
+
+**示例:**
+```python
+from lib import get_list_detail_all
+
+result = get_list_detail_all("0W97k", max_pages=10)
+print(f"清单: {result['list_name']}")
+print(f"总共 {len(result['works'])} 个作品")
+```
+
+---
+
+### 8. 获取所有清单
+
+#### `get_user_lists_all(max_pages=100)`
+
+获取用户的所有清单（自动翻页）。
+
+**参数:**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| max_pages | int | 否 | 最大页数限制，默认100 |
+
+**返回:** 清单列表
+
+```python
+[
+    {
+        "list_id": "0W97k",
+        "list_name": "我的收藏",
+        "list_url": "https://javdb.com/users/list_detail?id=0W97k",
+        "video_count": 50
+    },
+    ...
+]
+```
+
+**示例:**
+```python
+from lib import get_user_lists_all
+
+lists = get_user_lists_all(max_pages=10)
+print(f"总共 {len(lists)} 个清单")
+for lst in lists:
+    print(f"{lst['list_name']}: {lst['video_count']} 个作品")
 ```
 
 ---
