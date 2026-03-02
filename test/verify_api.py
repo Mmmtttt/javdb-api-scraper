@@ -451,6 +451,103 @@ def test_9_image_download():
         return False
 
 
+def test_10_nagano_ichika_full():
+    """测试10: 抓取永野一夏第一页所有作品详细信息并下载图片"""
+    print("\n" + "=" * 70)
+    print("测试10: 永野一夏第一页作品全量抓取+图片下载")
+    print("=" * 70)
+    
+    actor_name = "永野一夏"
+    actor_id = "NeOr"
+    
+    try:
+        # 1. 获取第一页作品（基础信息）
+        print(f"\n1. 获取 {actor_name} 的第一页作品...")
+        result = get_actor_works_by_page(actor_id, page=1)
+        
+        if not result or not result.get("works"):
+            log_test("nagano_ichika_full", False, "未找到作品")
+            return False
+        
+        works = result["works"]
+        total_works = len(works)
+        print(f"   找到 {total_works} 个作品")
+        
+        # 2. 获取每个作品的详细信息
+        print(f"\n2. 获取 {total_works} 个作品的详细信息...")
+        full_works = []
+        
+        for i, work in enumerate(works, 1):
+            video_id = work.get("video_id")
+            code = work.get("code", "unknown")
+            print(f"   [{i}/{total_works}] 获取 {code} (ID: {video_id})...", end=" ")
+            
+            try:
+                detail = get_video_detail(video_id, download_images=True)
+                if detail:
+                    full_works.append(detail)
+                    print("✅")
+                else:
+                    print("❌")
+            except Exception as e:
+                print(f"❌ ({e})")
+            
+            time.sleep(1)  # 避免请求过快
+        
+        print(f"\n   成功获取 {len(full_works)}/{total_works} 个作品的详细信息")
+        
+        # 3. 统计图片下载情况
+        print(f"\n3. 统计图片下载情况...")
+        total_images = 0
+        downloaded_images = 0
+        
+        for work in full_works:
+            images = work.get("thumbnail_images", [])
+            total_images += len(images)
+        
+        print(f"   总图片数: {total_images}")
+        
+        # 4. 保存结果到 JSON
+        output_data = {
+            "actor_name": actor_name,
+            "actor_id": actor_id,
+            "page": 1,
+            "total_works": total_works,
+            "successful_works": len(full_works),
+            "total_images": total_images,
+            "works": full_works,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        output_file = TEST_JSON_DIR / f"{actor_name}_works_full.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"\n   结果已保存到: {output_file}")
+        
+        # 5. 输出作品列表
+        print(f"\n   作品列表:")
+        for i, work in enumerate(full_works[:5], 1):  # 只显示前5个
+            code = work.get("code", "N/A")
+            title = work.get("title", "")[:40]
+            img_count = len(work.get("thumbnail_images", []))
+            print(f"     {i}. [{code}] {title}... ({img_count} 张图片)")
+        
+        if len(full_works) > 5:
+            print(f"     ... 还有 {len(full_works) - 5} 个作品")
+        
+        log_test("nagano_ichika_full", True, 
+                f"成功抓取 {actor_name} 的 {len(full_works)} 个作品，"
+                f"共 {total_images} 张图片，结果保存到 {output_file}",
+                {"actor": actor_name, "works_count": len(full_works), "images_count": total_images})
+        
+        return True
+        
+    except Exception as e:
+        log_test("nagano_ichika_full", False, f"异常: {str(e)}")
+        return False
+
+
 def save_test_results():
     """保存测试结果"""
     results_file = TEST_JSON_DIR / "test_results.json"
@@ -504,6 +601,9 @@ def main():
     time.sleep(1)
     
     test_9_image_download()
+    time.sleep(1)
+    
+    test_10_nagano_ichika_full()
     
     summary = save_test_results()
     
