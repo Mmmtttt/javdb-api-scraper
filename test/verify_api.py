@@ -33,11 +33,11 @@ from javdb_api import (
     search_by_tags,
     search_by_tags_full,
 )
-from tag_manager import (
-    get_tag_info,
-    search_tag_by_name,
-    get_category_list,
-)
+# from tag_manager import (  # 标签管理功能已移至 lib
+#     get_tag_info,
+#     search_tag_by_name,
+#     get_category_list,
+# )
 
 TEST_OUTPUT_DIR = Path(__file__).parent / "output"
 TEST_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -486,7 +486,7 @@ def main():
     test_7_search_by_tags_full()
     time.sleep(1)
     
-    test_8_tag_manager()
+    # test_8_tag_manager()  # 标签管理功能已移至 lib
     time.sleep(1)
     
     test_9_image_download()

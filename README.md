@@ -6,20 +6,23 @@ JAVDB 视频平台 API 抓取工具，采用适配器模式设计，支持多种
 
 ```
 javdb-api-scraper/
-├── core/
-│   ├── __init__.py
-│   └── platform.py              # 平台枚举和ID处理
-├── third_party/
-│   ├── __init__.py
-│   ├── base_adapter.py          # 适配器基类
-│   ├── javdb_adapter.py         # JAVDB平台适配器
-│   ├── adapter_factory.py       # 适配器工厂
-│   └── external_api.py          # 统一外部API接口
+├── lib/                          # 核心库
+│   ├── __init__.py               # 库入口，导出所有公共接口
+│   ├── platform.py               # 平台枚举和ID处理
+│   ├── base_adapter.py           # 适配器基类
+│   ├── javdb_adapter.py          # JAVDB平台适配器
+│   ├── adapter_factory.py        # 适配器工厂
+│   ├── external_api.py           # 统一外部API接口
+│   ├── crypto_utils.py           # 加密/解密工具
+│   └── login.py                 # 登录功能
+├── test/                        # 测试目录
+│   ├── README.md                 # 测试说明
+│   └── verify_api.py            # API验证测试
 ├── javdb_api.py                 # 原始JAVDB API实现
-├── tag_manager.py               # 标签管理
-├── utils.py                     # 工具函数
-├── config.example.py            # 配置示例
-└── third_party_config.json      # 第三方API配置
+├── config.example.py             # 配置示例
+├── third_party_config.json       # 第三方API配置
+├── requirements.txt              # 依赖
+└── README.md                    # 本文档
 ```
 
 ## 快速开始
@@ -30,10 +33,21 @@ javdb-api-scraper/
 pip install -r requirements.txt
 ```
 
+### 配置
+
+1. 复制配置示例文件：
+```bash
+cp config.example.py config.py
+```
+
+2. 编辑 `config.py`，配置域名、超时时间等参数
+
+3. （可选）如需登录功能，配置账号密码
+
 ### 使用统一 API 接口
 
 ```python
-from third_party.external_api import (
+from lib import (
     search_videos,
     get_video_detail,
     get_video_by_code,
@@ -69,8 +83,7 @@ for work in result['works']:
 ### 使用适配器模式
 
 ```python
-from third_party.adapter_factory import AdapterFactory
-from core.platform import Platform
+from lib import AdapterFactory, Platform
 
 # 获取适配器
 adapter = AdapterFactory.get_adapter(Platform.JAVDB)
@@ -83,6 +96,36 @@ detail = adapter.get_video_detail("YwG8Ve")
 data = adapter.convert_to_standard_format(videos)
 print(f"视频数: {len(data['videos'])}")
 print(f"标签数: {len(data['tags'])}")
+```
+
+### 使用加密功能
+
+```python
+from lib import CryptoUtils, DEFAULT_KEY
+
+# 加密数据
+encrypted = CryptoUtils.xor_encrypt("Hello, World!", DEFAULT_KEY)
+
+# 解密数据
+decrypted = CryptoUtils.xor_decrypt(encrypted, DEFAULT_KEY)
+
+# 加密文件
+CryptoUtils.encrypt_file("input.txt", "output.enc", DEFAULT_KEY)
+
+# 解密文件
+content = CryptoUtils.decrypt_file("output.enc", DEFAULT_KEY)
+```
+
+### 使用登录功能
+
+```python
+from lib import login, ensure_login
+
+# 登录（使用配置文件中的账号密码）
+success = login()
+
+# 自动登录（先尝试加载 cookies，过期则重新登录）
+success = ensure_login()
 ```
 
 ## API 参考
@@ -253,41 +296,36 @@ print(f"标签数: {len(data['tags'])}")
 
 要添加新的视频平台，需要：
 
-1. 在 `core/platform.py` 中添加平台枚举
+1. 在 `lib/platform.py` 中添加平台枚举
 2. 创建新的适配器类，继承 `BaseAdapter`
-3. 在 `third_party/adapter_factory.py` 中注册适配器
+3. 在 `lib/adapter_factory.py` 中注册适配器
 4. 在 `third_party_config.json` 中添加配置
 
 ## 配置
 
-编辑 `third_party_config.json` 文件：
+编辑 `config.py` 文件：
 
-```json
-{
-  "default_adapter": "javdb",
-  "adapters": {
-    "javdb": {
-      "enabled": true,
-      "domain_index": 0,
-      "timeout": 30,
-      "retry_times": 3,
-      "sleep_time": 0.5
-    }
-  }
+```python
+JAVDB = {
+    'domains': ['javdb.com', 'javdb123.com'],
+    'timeout': 30,
+    'retry_times': 3,
+    'sleep_time': 0.5
+}
+
+LOGIN = {
+    'username': 'your_email@example.com',
+    'password': 'your_password'
 }
 ```
 
 ## 测试
 
+运行 API 验证测试：
+
 ```bash
-# 运行所有测试
-python test_api.py
-
-# 运行标签测试
-python test_tags.py
-
-# 运行完整性测试
-python test_completeness.py
+cd test
+python verify_api.py
 ```
 
 ## 许可证
