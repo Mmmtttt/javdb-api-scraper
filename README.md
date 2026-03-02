@@ -1,203 +1,295 @@
 # JAVDB API Scraper
 
-JAVDB 爬虫 API，支持无浏览器爬取、Cloudflare 绕过、标签搜索、演员作品抓取等功能。
+JAVDB 视频平台 API 抓取工具，采用适配器模式设计，支持多种视频平台的统一接口访问。
 
-## 功能特性
-
-- **无浏览器爬取**：使用 curl_cffi 绕过 Cloudflare，无需打开浏览器
-- **自动登录**：支持账号密码登录，自动保存 cookies
-- **视频详情抓取**：番号、标题、标签、演员、磁力链接、缩略图等
-- **演员作品抓取**：支持分页、全量信息抓取
-- **标签搜索**：支持多类标签组合搜索（如 c1=23&c3=78）
-- **标签数据库**：342 个标签，10 个分类
-- **图片下载**：自动下载高清缩略图
-
-## 目录结构
+## 架构设计
 
 ```
 javdb-api-scraper/
-├── config.py              # 配置文件（含账号信息）
-├── javdb_api.py           # 核心 API 模块
-├── tag_manager.py         # 标签管理模块
-├── login.py               # 自动登录模块
-├── utils.py               # 工具函数
-├── parse_tags_html.py     # 标签数据库解析脚本
-├── requirements.txt       # 依赖列表
-├── cookies.json           # 登录 cookies
-├── test/                  # 测试目录
-│   ├── verify_api.py      # API 验证测试
-│   ├── test_all_apis.py   # API 测试脚本
-│   └── test_tags_final.py # 标签功能测试
-└── output/
-    ├── tags_database.json # 标签数据库
-    ├── json/              # JSON 数据输出
-    ├── images/            # 缩略图下载
-    └── magnets/           # 磁力链接导出
+├── core/
+│   ├── __init__.py
+│   └── platform.py              # 平台枚举和ID处理
+├── third_party/
+│   ├── __init__.py
+│   ├── base_adapter.py          # 适配器基类
+│   ├── javdb_adapter.py         # JAVDB平台适配器
+│   ├── adapter_factory.py       # 适配器工厂
+│   └── external_api.py          # 统一外部API接口
+├── javdb_api.py                 # 原始JAVDB API实现
+├── tag_manager.py               # 标签管理
+├── utils.py                     # 工具函数
+├── config.example.py            # 配置示例
+└── third_party_config.json      # 第三方API配置
 ```
 
-## 安装
+## 快速开始
+
+### 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 配置
-
-1. 复制配置文件模板：
-```bash
-cp config.example.py config.py
-```
-
-2. 编辑 `config.py` 填入你的账号信息：
-```python
-LOGIN = {
-    'username': 'your_username',
-    'password': 'your_password',
-}
-```
-
-## API 接口
-
-### 视频相关
+### 使用统一 API 接口
 
 ```python
-from javdb_api import get_video_detail, get_video_by_code
+from third_party.external_api import (
+    search_videos,
+    get_video_detail,
+    get_video_by_code,
+    search_actor,
+    get_actor_works,
+)
 
-# 抓取作品页全量信息
-detail = get_video_detail("YwG8Ve", download_images=True)
-print(detail['code'])      # MIDA-583
-print(detail['tags'])      # ['美少女電影', '單體作品', ...]
-print(detail['actors'])    # ['井上もも']
+# 搜索视频
+videos = search_videos("SSIS", max_pages=2)
+for video in videos:
+    print(f"{video['code']}: {video['title']}")
 
-# 根据番号搜索并获取详情
+# 获取视频详情
+detail = get_video_detail("YwG8Ve")
+print(f"标题: {detail['title']}")
+print(f"磁力链接: {detail['magnets']}")
+
+# 根据番号搜索
 detail = get_video_by_code("MIDA-583")
-```
-
-### 演员相关
-
-```python
-from javdb_api import search_actor, get_actor_works_by_page, get_actor_works_full_by_page
+print(f"标题: {detail['title']}")
 
 # 搜索演员
 actors = search_actor("井上もも")
-print(actors[0]['actor_id'])  # 0R1n3
+for actor in actors:
+    print(f"{actor['actor_name']}: {actor['actor_id']}")
 
-# 获取演员作品（分页，基础信息）
-result = get_actor_works_by_page("0R1n3", page=1)
-print(result['has_next'])     # 是否有下一页
-print(len(result['works']))   # 作品数量
-
-# 获取演员作品全量信息（分页）
-result = get_actor_works_full_by_page("0R1n3", page=1, download_images=True)
+# 获取演员作品
+result = get_actor_works("0R1n3", max_pages=2)
+for work in result['works']:
+    print(f"{work['code']}: {work['title']}")
 ```
 
-### 标签搜索
+### 使用适配器模式
 
 ```python
-from javdb_api import search_by_tags, search_by_tags_full
+from third_party.adapter_factory import AdapterFactory
+from core.platform import Platform
 
-# 多类标签组合搜索（基础信息）
-result = search_by_tags(page=1, c3=78)           # 水手服
-result = search_by_tags(page=1, c4=17, c5=18)    # 巨乳 + 中出
+# 获取适配器
+adapter = AdapterFactory.get_adapter(Platform.JAVDB)
 
-# 多类标签组合搜索（全量信息）
-result = search_by_tags_full(page=1, c3=78, download_images=True)
+# 使用适配器方法
+videos = adapter.search_videos("SSIS", max_pages=2)
+detail = adapter.get_video_detail("YwG8Ve")
+
+# 转换为标准格式
+data = adapter.convert_to_standard_format(videos)
+print(f"视频数: {len(data['videos'])}")
+print(f"标签数: {len(data['tags'])}")
 ```
 
-### 标签管理
+## API 参考
+
+### 视频相关
+
+#### `search_videos(keyword, max_pages=1, platform=None)`
+搜索视频
+
+**参数:**
+- `keyword`: 搜索关键词
+- `max_pages`: 最大搜索页数
+- `platform`: 平台名称，默认使用配置中的默认平台
+
+**返回:** 视频列表
+
+#### `get_video_detail(video_id, platform=None)`
+获取视频详情
+
+**参数:**
+- `video_id`: 视频ID
+- `platform`: 平台名称
+
+**返回:** 视频详情字典
+
+#### `get_video_by_code(code, platform=None)`
+根据番号获取视频详情
+
+**参数:**
+- `code`: 番号（如 MIDA-583）
+- `platform`: 平台名称
+
+**返回:** 视频详情字典
+
+### 演员相关
+
+#### `search_actor(actor_name, platform=None)`
+搜索演员
+
+**参数:**
+- `actor_name`: 演员名字
+- `platform`: 平台名称
+
+**返回:** 演员列表
+
+#### `get_actor_works(actor_id, page=1, max_pages=1, full_detail=False, platform=None)`
+获取演员作品
+
+**参数:**
+- `actor_id`: 演员ID
+- `page`: 起始页码
+- `max_pages`: 最大页数
+- `full_detail`: 是否获取完整详情
+- `platform`: 平台名称
+
+**返回:** 作品列表和分页信息
+
+### 标签相关
+
+#### `get_tag_works(tag_id, page=1, max_pages=1, platform=None)`
+获取标签作品
+
+**参数:**
+- `tag_id`: 标签ID
+- `page`: 起始页码
+- `max_pages`: 最大页数
+- `platform`: 平台名称
+
+**返回:** 作品列表和分页信息
+
+#### `search_by_tags(page=1, max_pages=1, platform=None, **tag_params)`
+多标签组合搜索
+
+**参数:**
+- `page`: 起始页码
+- `max_pages`: 最大页数
+- `platform`: 平台名称
+- `**tag_params`: 标签参数，如 c1=23, c3=78
+
+**返回:** 作品列表和分页信息
+
+### 下载相关
+
+#### `download_video_images(video_id, download_dir=None, platform=None)`
+下载视频缩略图
+
+**参数:**
+- `video_id`: 视频ID
+- `download_dir`: 下载目录
+- `platform`: 平台名称
+
+**返回:** (成功下载数, 总数)
+
+### 数据转换
+
+#### `convert_to_standard_format(videos, platform=None)`
+将平台数据转换为系统标准格式
+
+**参数:**
+- `videos`: 视频数据列表
+- `platform`: 平台名称
+
+**返回:** 标准格式的视频和标签数据
+
+## 数据格式
+
+### 视频详情格式
 
 ```python
-from tag_manager import get_tag_info, search_tag_by_name, get_category_list
-
-# 查询标签信息
-tag = get_tag_info("c3", 78)  # 水手服
-print(tag['name'])  # 水手服
-
-# 根据名称搜索标签
-results = search_tag_by_name("巨乳")
-# 结果: c4 (體型): 17 = 巨乳
-
-# 获取所有分类
-categories = get_category_list()
-```
-
-## 标签分类
-
-| 分类 | 名称 | 标签数 |
-|------|------|--------|
-| c1 | 主題 | 60 |
-| c2 | 角色 | 53 |
-| c3 | 服裝 | 39 |
-| c4 | 體型 | 20 |
-| c5 | 行爲 | 40 |
-| c6 | 玩法 | 37 |
-| c7 | 類別 | 58 |
-| c9 | 時長 | 2 |
-| c10 | 基本 | 7 |
-| c11 | 年份 | 26 |
-
-## 输出格式
-
-### 视频详情
-
-```json
 {
-  "video_id": "YwG8Ve",
-  "code": "MIDA-583",
-  "title": "エッチ覚醒4本番...",
-  "date": "2026-03-04",
-  "actors": ["井上もも"],
-  "tags": ["美少女電影", "單體作品", "情侶", "口交", "顏射", "主觀視角"],
-  "series": "系列名称",
-  "rating": "4.57分",
-  "thumbnail_images": ["https://..."],
-  "preview_video": "https://...",
-  "magnets": [
-    {"name": "MIDA-583", "size": "5.2GB", "link": "magnet:?xt=..."}
-  ]
+    "video_id": "YwG8Ve",
+    "code": "MIDA-583",
+    "title": "作品标题",
+    "date": "2026-03-04",
+    "tags": ["美少女電影", "單體作品", "情侶"],
+    "actors": ["井上もも"],
+    "series": "系列名",
+    "magnets": [
+        {
+            "magnet": "magnet:?xt=urn:btih:...",
+            "size_text": "5.27GB",
+            "size_mb": 5396.48
+        }
+    ],
+    "thumbnail_images": [
+        "https://c0.jdbstatic.com/samples/yw/YwG8Ve_l_0.jpg",
+        ...
+    ],
+    "preview_video": "",
+    "cover_url": "https://c0.jdbstatic.com/covers/yw/YwG8Ve.jpg"
 }
 ```
 
-### 演员作品
+### 标准格式
+
+```python
+{
+    "videos": [
+        {
+            "id": "JAVDB_YwG8Ve",
+            "video_id": "YwG8Ve",
+            "code": "MIDA-583",
+            "title": "作品标题",
+            "date": "2026-03-04",
+            "cover_path": "https://...",
+            "thumbnail_images": [...],
+            "magnets": [...],
+            "actors": ["井上もも"],
+            "series": "",
+            "rating": "4.57分",
+            "tag_ids": ["tag_001", "tag_002"],
+            "create_time": "2026-03-02T10:00:00",
+            "last_read_time": "2026-03-02T10:00:00",
+            "is_deleted": False
+        }
+    ],
+    "tags": [
+        {
+            "id": "tag_001",
+            "name": "美少女電影",
+            "create_time": "2026-03-02T10:00:00"
+        }
+    ]
+}
+```
+
+## 添加新平台
+
+要添加新的视频平台，需要：
+
+1. 在 `core/platform.py` 中添加平台枚举
+2. 创建新的适配器类，继承 `BaseAdapter`
+3. 在 `third_party/adapter_factory.py` 中注册适配器
+4. 在 `third_party_config.json` 中添加配置
+
+## 配置
+
+编辑 `third_party_config.json` 文件：
 
 ```json
 {
-  "page": 1,
-  "has_next": true,
-  "works": [
-    {
-      "video_id": "YwG8Ve",
-      "code": "MIDA-583",
-      "title": "作品标题",
-      "date": "2026-03-04",
-      "rating": "4.57分"
+  "default_adapter": "javdb",
+  "adapters": {
+    "javdb": {
+      "enabled": true,
+      "domain_index": 0,
+      "timeout": 30,
+      "retry_times": 3,
+      "sleep_time": 0.5
     }
-  ]
+  }
 }
-```
-
-## 更新标签数据库
-
-1. 登录 JAVDB 后访问 `https://javdb.com/tags`
-2. 保存网页为 HTML 文件
-3. 运行解析脚本：
-
-```bash
-python parse_tags_html.py
 ```
 
 ## 测试
 
 ```bash
-# 测试所有 API
-python test_all_apis.py
+# 运行所有测试
+python test_api.py
 
-# 测试标签功能
-python test_tags_final.py
+# 运行标签测试
+python test_tags.py
+
+# 运行完整性测试
+python test_completeness.py
 ```
 
-## 注意事项
+## 许可证
 
-- 请合理使用，避免频繁请求
-- 标签页面需要登录后才能访问完整内容
-- 图片下载会自动使用高清版本（_l_ 替换 _s_）
+MIT License
