@@ -15,11 +15,25 @@ JAVDB API 核心模块
 - scrape_actor_full: 全量抓取演员所有信息
 
 标签管理模块 (tag_manager):
-- fetch_tags: 爬取标签分类建立数据库
-- get_tag_info: 获取特定标签信息
-- search_tag_by_name: 根据名称搜索标签
-- build_tag_url: 构建标签搜索URL
-- get_category_list: 获取所有分类列表
+- get_tag_by_name: 通过标签名称获取标签信息（支持简体自动转繁体）
+- get_tag_by_id: 通过标签ID获取标签信息
+- search_tags_by_keyword: 通过关键词模糊搜索标签（支持简体自动转繁体）
+- convert_to_traditional: 简体转换为繁体
+- TagManager: 标签管理器类
+
+使用示例:
+    # 通过标签名称获取标签ID（自动处理简繁转换）
+    >>> tag = get_tag_by_name("美少女")
+    >>> print(tag['id'])  # c1=23
+    
+    # 通过标签ID获取标签名称
+    >>> tag = get_tag_by_id("c1=23")
+    >>> print(tag['name'])  # 美少女
+    
+    # 模糊搜索标签
+    >>> tags = search_tags_by_keyword("女")
+    >>> for tag in tags:
+    ...     print(f"{tag['name']}: {tag['id']}")
 """
 
 import re
@@ -73,6 +87,87 @@ class JavdbAPI:
         self.image_downloader = ImageDownloader(self.session)
         self.json_exporter = JSONExporter()
         self.magnet_exporter = MagnetExporter()
+        
+        # 初始化标签管理器（延迟加载）
+        self._tag_manager = None
+    
+    @property
+    def tag_manager(self):
+        """获取标签管理器实例（延迟加载）"""
+        if self._tag_manager is None:
+            from lib.tag_manager import TagManager
+            self._tag_manager = TagManager()
+        return self._tag_manager
+    
+    def _resolve_tag_params(self, **params) -> Dict[str, int]:
+        """
+        解析标签参数，将标签名称转换为标签ID
+        
+        支持三种格式：
+        1. 直接指定ID: c1=23, c3=78
+        2. 通过名称查找（带分类前缀）: tag_主題="美少女", tag_服裝="水手服"
+        3. 直接标签名称（最简单）: 淫亂真實="", 美少女="", 水手服=""
+           或 tags=["淫亂真實", "水手服"]
+        
+        Args:
+            **params: 标签参数
+            
+        Returns:
+            转换后的标签参数字典
+        """
+        result = {}
+        
+        # 处理 tags 参数（列表格式）
+        if 'tags' in params and isinstance(params['tags'], list):
+            for tag_name in params['tags']:
+                self._resolve_single_tag(tag_name, result)
+            return result
+        
+        for key, value in params.items():
+            if key.startswith('c') and key[1:].isdigit():
+                # 直接指定ID格式: c1=23
+                result[key] = int(value) if isinstance(value, str) else value
+            elif key.startswith('tag_'):
+                # 通过名称查找格式: tag_主題="美少女"
+                tag_name = value if value else key[4:]  # 如果值为空，使用key的后缀作为标签名
+                self._resolve_single_tag(tag_name, result)
+            elif key in ['tags', 'page', 'download_images', 'max_pages']:
+                # 保留特殊参数，不处理
+                continue
+            else:
+                # 其他情况：key 可能是标签名称
+                # 例如: 淫亂真實="", 美少女=""
+                tag_name = key if not value else value
+                self._resolve_single_tag(tag_name, result)
+        
+        return result
+    
+    def _resolve_single_tag(self, tag_name: str, result: Dict[str, int]):
+        """
+        解析单个标签名称并添加到结果中
+        
+        Args:
+            tag_name: 标签名称
+            result: 结果字典
+        """
+        # 查找标签
+        tag_info = self.tag_manager.get_tag_by_name(tag_name)
+        if tag_info:
+            category = tag_info['category']
+            tag_id = tag_info['tag_id']
+            result[category] = tag_id
+            print(f"✓ 找到标签 '{tag_name}' -> {category}={tag_id}")
+        else:
+            # 尝试搜索相似标签
+            similar_tags = self.tag_manager.search_tags_by_keyword(tag_name)
+            if similar_tags:
+                tag_info = similar_tags[0]
+                category = tag_info['category']
+                tag_id = tag_info['tag_id']
+                result[category] = tag_id
+                print(f"⚠ 未找到精确匹配 '{tag_name}'，使用相似标签 '{tag_info['name']}' -> {category}={tag_id}")
+            else:
+                raise ValueError(f"未找到标签: '{tag_name}'，请检查标签名称是否正确")
     
     @property
     def base_url(self) -> str:
@@ -909,10 +1004,14 @@ class JavdbAPI:
         多类标签组合搜索（基础信息）
         
         支持多类标签组合，如 c1=23&c3=78
+        支持通过标签名称搜索，自动转换为标签ID
         
         Args:
             page: 页码
-            **tag_params: 标签参数，如 c1=23, c3=78, c5=100
+            **tag_params: 标签参数，支持两种格式：
+                1. 直接指定ID: c1=23, c3=78
+                2. 通过名称查找: tag_主題="美少女", tag_服裝="水手服"
+                3. 简写格式: 主題="美少女", 服裝="水手服"（自动识别为标签名称）
             
         Returns:
             {
@@ -933,20 +1032,30 @@ class JavdbAPI:
             }
             
         示例:
-            # 搜索第一类第23个标签 + 第三类第78个标签
-            result = api.search_by_tags(page=1, c1=23, c3=78)
+            # 方式1: 最简单 - 直接输入标签名称
+            result = api.search_by_tags(page=1, **{"淫亂真實": ""})
+            result = api.search_by_tags(page=1, **{"美少女": "", "水手服": ""})
             
-            # 只搜索第五类（服裝）的水手服
-            result = api.search_by_tags(page=1, c5=78)
+            # 方式2: 使用 tags 参数传递列表
+            result = api.search_by_tags(page=1, tags=["淫亂真實", "水手服"])
+            
+            # 方式3: 带分类前缀（更精确）
+            result = api.search_by_tags(page=1, tag_主題="淫亂真實")
+            
+            # 方式4: 传统ID模式（仍然支持）
+            result = api.search_by_tags(page=1, c1=23, c3=78)
         """
+        # 解析标签参数（支持名称和ID多种格式）
+        resolved_params = self._resolve_tag_params(**tag_params)
+        
         # 构建 URL 参数
         params = []
-        for key, value in tag_params.items():
+        for key, value in resolved_params.items():
             if key.startswith('c') and value is not None:
                 params.append(f"{key}={value}")
         
         if not params:
-            raise ValueError("至少需要提供一个标签参数（如 c1=23）")
+            raise ValueError("至少需要提供一个标签参数（如 c1=23 或 tag_主題='美少女'）")
         
         query_string = "&".join(params)
         
@@ -975,7 +1084,7 @@ class JavdbAPI:
         return {
             'page': page,
             'has_next': has_next,
-            'tag_params': tag_params,
+            'tag_params': resolved_params,
             'works': works,
         }
     
@@ -985,11 +1094,14 @@ class JavdbAPI:
         多类标签组合搜索（全量信息）
         
         支持多类标签组合，获取作品全量信息
+        支持通过标签名称搜索，自动转换为标签ID
         
         Args:
             page: 页码
             download_images: 是否下载缩略图
-            **tag_params: 标签参数，如 c1=23, c3=78
+            **tag_params: 标签参数，支持两种格式：
+                1. 直接指定ID: c1=23, c3=78
+                2. 通过名称查找: tag_主題="美少女", tag_服裝="水手服"
             
         Returns:
             {
@@ -1009,6 +1121,14 @@ class JavdbAPI:
                     ...
                 ]
             }
+            
+        示例:
+            # 方式1: 直接指定标签ID
+            result = api.search_by_tags_full(page=1, c1=23, c3=78)
+            
+            # 方式2: 通过标签名称搜索（推荐）
+            result = api.search_by_tags_full(page=1, tag_主題="淫亂真實")
+            result = api.search_by_tags_full(page=1, tag_主題="美少女", tag_服裝="水手服")
         """
         result = self.search_by_tags(page, **tag_params)
         
@@ -1275,10 +1395,13 @@ def search_by_tags(page: int = 1, **tag_params) -> Dict:
     多类标签组合搜索（基础信息）
     
     支持多类标签组合，如 c1=23&c3=78
+    支持通过标签名称搜索，自动转换为标签ID
     
     Args:
         page: 页码
-        **tag_params: 标签参数，如 c1=23, c3=78, c5=100
+        **tag_params: 标签参数，支持两种格式：
+            1. 直接指定ID: c1=23, c3=78
+            2. 通过名称查找: tag_主題="美少女", tag_服裝="水手服"
         
     Returns:
         {
@@ -1289,28 +1412,32 @@ def search_by_tags(page: int = 1, **tag_params) -> Dict:
         }
         
     示例:
-        # 搜索第一类第23个标签 + 第三类第78个标签
+        # 方式1: 直接指定标签ID
         result = search_by_tags(page=1, c1=23, c3=78)
         
-        # 只搜索第五类（服裝）的水手服
-        result = search_by_tags(page=1, c5=78)
+        # 方式2: 通过标签名称搜索（推荐）
+        result = search_by_tags(page=1, tag_主題="淫亂真實")
+        result = search_by_tags(page=1, tag_主題="美少女", tag_服裝="水手服")
     """
     api = JavdbAPI()
     return api.search_by_tags(page, **tag_params)
 
 
-def search_by_tags_full(page: int = 1, download_images: bool = False, 
+def search_by_tags_full(page: int = 1, download_images: bool = False,
                         **tag_params) -> Dict:
     """
     多类标签组合搜索（全量信息）
-    
+
     支持多类标签组合，获取作品全量信息
-    
+    支持通过标签名称搜索，自动转换为标签ID
+
     Args:
         page: 页码
         download_images: 是否下载缩略图
-        **tag_params: 标签参数，如 c1=23, c3=78
-        
+        **tag_params: 标签参数，支持两种格式：
+            1. 直接指定ID: c1=23, c3=78
+            2. 通过名称查找: tag_主題="美少女", tag_服裝="水手服"
+
     Returns:
         {
             'page': 1,
@@ -1318,6 +1445,25 @@ def search_by_tags_full(page: int = 1, download_images: bool = False,
             'tag_params': {'c1': 23, 'c3': 78},
             'works': [...]
         }
+
+    示例:
+        # 方式1: 直接指定标签ID
+        result = search_by_tags_full(page=1, c1=23, c3=78)
+
+        # 方式2: 通过标签名称搜索（推荐）
+        result = search_by_tags_full(page=1, tag_主題="淫亂真實")
+        result = search_by_tags_full(page=1, tag_主題="美少女", tag_服裝="水手服")
     """
     api = JavdbAPI()
     return api.search_by_tags_full(page, download_images, **tag_params)
+
+
+# ==================== 标签管理模块导出 ====================
+from lib.tag_manager import (
+    TagManager,
+    get_tag_manager,
+    get_tag_by_name,
+    get_tag_by_id,
+    search_tags_by_keyword,
+    convert_to_traditional,
+)

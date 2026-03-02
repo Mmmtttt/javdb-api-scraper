@@ -11,6 +11,7 @@ API 验证测试脚本
 6. 标签搜索 - search_by_tags
 7. 标签搜索全量 - search_by_tags_full
 8. 标签管理 - get_tag_info, search_tag_by_name
+9. 演员作品标签筛选 - get_actor_works_with_tags
 """
 
 import sys
@@ -32,6 +33,10 @@ from javdb_api import (
     get_actor_works_full_by_page,
     search_by_tags,
     search_by_tags_full,
+    get_tag_by_name,
+    get_tag_by_id,
+    search_tags_by_keyword,
+    convert_to_traditional,
 )
 # from tag_manager import (  # 标签管理功能已移至 lib
 #     get_tag_info,
@@ -46,6 +51,231 @@ TEST_IMAGES_DIR = TEST_OUTPUT_DIR / "images"
 TEST_JSON_DIR = TEST_OUTPUT_DIR / "json"
 TEST_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 TEST_JSON_DIR.mkdir(parents=True, exist_ok=True)
+
+# ============================================================================
+# 测试配置表 - 在这里配置要测试的内容
+# ============================================================================
+
+# 视频详情测试配置
+VIDEO_DETAIL_TESTS = [
+    {
+        "name": "测试视频详情1",
+        "video_id": "YwG8Ve",
+        "download_images": False,
+        "enabled": True,
+    },
+    {
+        "name": "测试视频详情2",
+        "video_id": "RqGjB2",
+        "download_images": False,
+        "enabled": False,
+    },
+]
+
+# 番号搜索测试配置
+CODE_SEARCH_TESTS = [
+    {
+        "name": "测试番号搜索1",
+        "code": "MIDA-583",
+        "enabled": True,
+    },
+    {
+        "name": "测试番号搜索2",
+        "code": "SSIS-001",
+        "enabled": False,
+    },
+]
+
+# 演员搜索测试配置
+ACTOR_SEARCH_TESTS = [
+    {
+        "name": "测试演员搜索1",
+        "actor_name": "井上もも",
+        "enabled": True,
+    },
+    {
+        "name": "测试演员搜索2",
+        "actor_name": "永野一夏",
+        "enabled": True,
+    },
+]
+
+# 演员作品测试配置
+ACTOR_WORKS_TESTS = [
+    {
+        "name": "测试演员作品1 - 井上もも第一页",
+        "actor_id": "0R1n3",
+        "actor_name": "井上もも",
+        "page": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试演员作品2 - 永野一夏第一页",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "page": 1,
+        "enabled": True,
+    },
+]
+
+# 演员作品全量测试配置
+ACTOR_WORKS_FULL_TESTS = [
+    {
+        "name": "测试演员全量作品1 - 井上もも",
+        "actor_id": "0R1n3",
+        "actor_name": "井上もも",
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试演员全量作品2 - 永野一夏",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "max_pages": 1,
+        "enabled": True,
+    },
+]
+
+# 演员作品标签筛选测试配置
+ACTOR_TAG_FILTER_TESTS = [
+    {
+        "name": "测试标签筛选1 - 永野一夏的美少女作品",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "tag_names": ["美少女"],
+        "max_pages": 1,
+        "get_details": True,
+        "download_images": False,
+        "save_temp": True,
+        "enabled": True,
+    },
+    {
+        "name": "测试标签筛选2 - 永野一夏的多标签组合",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "tag_names": ["美少女", "單體作品"],
+        "max_pages": 1,
+        "get_details": True,
+        "download_images": False,
+        "save_temp": True,
+        "enabled": False,
+    },
+]
+
+# 标签搜索测试配置
+TAG_SEARCH_TESTS = [
+    {
+        "name": "测试标签搜索1 - 最简单方式（直接标签名）",
+        "tag_params": {"淫亂真實": ""},
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试标签搜索2 - 使用tags列表",
+        "tag_params": {"tags": ["淫亂真實", "水手服"]},
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试标签搜索3 - 简体自动转繁体",
+        "tag_params": {"淫乱真实": ""},
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试标签搜索4 - 带分类前缀",
+        "tag_params": {"tag_主題": "淫亂真實"},
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试标签搜索5 - 传统ID模式",
+        "tag_params": {"c1": 23},
+        "max_pages": 1,
+        "enabled": True,
+    },
+]
+
+# 标签全量搜索测试配置
+TAG_SEARCH_FULL_TESTS = [
+    {
+        "name": "测试标签全量搜索1 - 最简单方式",
+        "tag_params": {"淫亂真實": ""},
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试标签全量搜索2 - 使用tags列表",
+        "tag_params": {"tags": ["美少女", "水手服"]},
+        "max_pages": 1,
+        "enabled": True,
+    },
+]
+
+# 演员作品全量抓取+图片下载测试配置
+ACTOR_WORKS_FULL_IMAGE_TESTS = [
+    {
+        "name": "测试全量抓取+图片 - 永野一夏第一页",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "page": 1,
+        "enabled": False,
+    },
+]
+
+# 高清预览图下载测试配置
+HD_PREVIEW_DOWNLOAD_TESTS = [
+    {
+        "name": "测试高清预览图下载",
+        "video_id": "YwG8Ve",
+        "code": "MIDA-583",
+        "enabled": True,
+    },
+]
+
+# 登录测试配置
+LOGIN_TESTS = [
+    {
+        "name": "测试登录状态检查",
+        "enabled": True,
+    },
+    {
+        "name": "测试自动登录",
+        "auto_login": True,  # 改为 True
+        "enabled": True,  # 改为 True
+    },
+]
+
+# 标签管理测试配置
+TAG_MANAGER_TESTS = [
+    {
+        "name": "测试标签名称查询 - 美少女",
+        "tag_name": "美少女",
+        "expected_id": "c1=23",
+        "enabled": True,
+    },
+    {
+        "name": "测试标签名称查询 - 简体转繁体",
+        "tag_name": "淫乱真实",  # 简体
+        "expected_id": "c1=23",
+        "enabled": True,
+    },
+    {
+        "name": "测试标签ID查询",
+        "tag_id": "c1=23",
+        "expected_name": "淫亂真實",
+        "enabled": True,
+    },
+    {
+        "name": "测试标签关键词搜索",
+        "keyword": "女",
+        "enabled": True,
+    },
+]
+
+# ============================================================================
+# 旧版配置（保留兼容性）
+# ============================================================================
 
 TEST_DATA = {
     "video_id": "YwG8Ve",
@@ -576,34 +806,105 @@ def main():
     print(f"输出目录: {TEST_OUTPUT_DIR}")
     print("=" * 70)
     
-    test_1_get_video_detail()
-    time.sleep(1)
+    # 收集所有启用的测试用例
+    all_tests = []
     
-    test_2_get_video_by_code()
-    time.sleep(1)
+    # 视频详情测试
+    for test in VIDEO_DETAIL_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("视频详情", test, run_video_detail_test))
     
-    test_3_search_actor()
-    time.sleep(1)
+    # 番号搜索测试
+    for test in CODE_SEARCH_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("番号搜索", test, run_code_search_test))
     
-    test_4_get_actor_works_by_page()
-    time.sleep(1)
+    # 演员搜索测试
+    for test in ACTOR_SEARCH_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("演员搜索", test, run_actor_search_test))
     
-    test_5_get_actor_works_full_by_page()
-    time.sleep(1)
+    # 演员作品测试
+    for test in ACTOR_WORKS_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("演员作品", test, run_actor_works_test))
     
-    test_6_search_by_tags()
-    time.sleep(1)
+    # 演员作品全量测试
+    for test in ACTOR_WORKS_FULL_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("演员全量作品", test, run_actor_works_full_test))
     
-    test_7_search_by_tags_full()
-    time.sleep(1)
+    # 标签筛选测试
+    for test in ACTOR_TAG_FILTER_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("标签筛选", test, run_tag_filter_test))
     
-    # test_8_tag_manager()  # 标签管理功能已移至 lib
-    time.sleep(1)
+    # 标签搜索测试
+    for test in TAG_SEARCH_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("标签搜索", test, run_tag_search_test))
     
-    test_9_image_download()
-    time.sleep(1)
+    # 标签全量搜索测试
+    for test in TAG_SEARCH_FULL_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("标签全量搜索", test, run_tag_search_full_test))
     
-    test_10_nagano_ichika_full()
+    # 演员作品全量+图片测试
+    for test in ACTOR_WORKS_FULL_IMAGE_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("演员作品+图片", test, run_actor_works_full_image_test))
+    
+    # 高清预览图下载测试
+    for test in HD_PREVIEW_DOWNLOAD_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("高清预览图", test, run_hd_preview_download_test))
+    
+    # 登录测试
+    for test in LOGIN_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("登录测试", test, run_login_test))
+    
+    # 标签管理测试
+    for test in TAG_MANAGER_TESTS:
+        if test.get("enabled", False):
+            all_tests.append(("标签管理", test, run_tag_manager_test))
+    
+    print(f"启用的测试项: {len(all_tests)} 个")
+    print("=" * 70)
+    
+    # 显示测试列表
+    print("\n📋 测试用例列表:")
+    print("=" * 70)
+    print("0. 运行所有测试")
+    
+    for i, (category, test, _) in enumerate(all_tests, 1):
+        print(f"{i}. {category}: {test['name']}")
+    
+    print("=" * 70)
+    
+    # 获取用户选择
+    while True:
+        try:
+            choice = input("请输入测试编号 (0-全量测试): ")
+            choice = int(choice)
+            
+            if choice == 0:
+                # 运行所有测试
+                print("\n🚀 开始全量测试...")
+                for category, test, run_func in all_tests:
+                    run_func(test)
+                    time.sleep(1)
+                break
+            elif 1 <= choice <= len(all_tests):
+                # 运行指定测试
+                print("\n🚀 开始测试...")
+                category, test, run_func = all_tests[choice - 1]
+                run_func(test)
+                break
+            else:
+                print(f"请输入 0 到 {len(all_tests)} 之间的数字")
+        except ValueError:
+            print("请输入有效的数字")
     
     summary = save_test_results()
     
@@ -617,6 +918,407 @@ def main():
     print("=" * 70)
     
     return summary['failed'] == 0
+
+
+# ============================================================================
+# 配置化测试运行函数
+# ============================================================================
+
+def run_video_detail_test(config: dict):
+    """运行视频详情测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        detail = get_video_detail(config["video_id"], download_images=config.get("download_images", False))
+        
+        if validate_video_detail(detail, config["name"]):
+            data = {
+                "video_id": detail.get("video_id"),
+                "code": detail.get("code"),
+                "title": detail.get("title", "")[:50],
+                "date": detail.get("date"),
+                "tags_count": len(detail.get("tags", [])),
+                "magnets_count": len(detail.get("magnets", [])),
+            }
+            log_test(config["name"], True, f"视频ID: {config['video_id']}", data)
+        else:
+            log_test(config["name"], False, "验证失败")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_code_search_test(config: dict):
+    """运行番号搜索测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        detail = get_video_by_code(config["code"])
+        
+        if detail and detail.get("code"):
+            data = {
+                "code": detail.get("code"),
+                "title": detail.get("title", "")[:50],
+                "found": True,
+            }
+            log_test(config["name"], True, f"找到番号: {config['code']}", data)
+        else:
+            log_test(config["name"], False, f"未找到番号: {config['code']}")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_actor_search_test(config: dict):
+    """运行演员搜索测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        actors = search_actor(config["actor_name"])
+        
+        if actors:
+            data = {
+                "actor_name": config["actor_name"],
+                "count": len(actors),
+                "first_actor_id": actors[0].get("actor_id"),
+            }
+            log_test(config["name"], True, f"找到 {len(actors)} 个演员", data)
+        else:
+            log_test(config["name"], False, f"未找到演员: {config['actor_name']}")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_actor_works_test(config: dict):
+    """运行演员作品测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        result = get_actor_works_by_page(config["actor_id"], page=config.get("page", 1))
+        
+        if result and result.get("works"):
+            works = result["works"]
+            data = {
+                "actor_id": config["actor_id"],
+                "actor_name": config.get("actor_name"),
+                "page": config.get("page", 1),
+                "total_works": len(works),
+                "first_code": works[0].get("code") if works else None,
+            }
+            log_test(config["name"], True, f"找到 {len(works)} 个作品", data)
+        else:
+            log_test(config["name"], False, f"未找到作品")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_actor_works_full_test(config: dict):
+    """运行演员作品全量测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        api = JavdbAPI()
+        works = api.get_actor_works(
+            config["actor_id"],
+            max_pages=config.get("max_pages", 1),
+            get_details=False,
+            download_images=False
+        )
+        
+        if works:
+            data = {
+                "actor_id": config["actor_id"],
+                "actor_name": config.get("actor_name"),
+                "total_works": len(works),
+                "first_code": works[0].get("code") if works else None,
+            }
+            log_test(config["name"], True, f"找到 {len(works)} 个作品", data)
+        else:
+            log_test(config["name"], False, f"未找到作品")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_tag_filter_test(config: dict):
+    """运行标签筛选测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        api = JavdbAPI()
+        result = api.get_actor_works_with_tags(
+            actor_id=config["actor_id"],
+            tag_names=config.get("tag_names"),
+            max_pages=config.get("max_pages", 1),
+            get_details=config.get("get_details", False),
+            download_images=config.get("download_images", False),
+            save_temp=config.get("save_temp", True)
+        )
+        
+        data = {
+            "actor_id": config["actor_id"],
+            "actor_name": config.get("actor_name"),
+            "tags": config.get("tag_names"),
+            "total_works": result["total_works"],
+            "filtered_works": result["filtered_works"],
+            "filter_rate": round(result["filtered_works"] / result["total_works"] * 100, 1) if result["total_works"] > 0 else 0,
+        }
+        log_test(config["name"], True, f"筛选结果: {result['filtered_works']}/{result['total_works']}", data)
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_tag_search_test(config: dict):
+    """运行标签搜索测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        result = search_by_tags(
+            page=1,
+            max_pages=config.get("max_pages", 1),
+            **config.get("tag_params", {})
+        )
+        
+        if result and result.get("works"):
+            works = result["works"]
+            data = {
+                "tag_params": config.get("tag_params"),
+                "count": len(works),
+                "first_code": works[0].get("code") if works else None,
+            }
+            log_test(config["name"], True, f"找到 {len(works)} 个作品", data)
+        else:
+            log_test(config["name"], False, f"未找到作品")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_tag_search_full_test(config: dict):
+    """运行标签全量搜索测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        result = search_by_tags_full(
+            page=1,
+            max_pages=config.get("max_pages", 1),
+            **config.get("tag_params", {})
+        )
+        
+        if result and result.get("works"):
+            works = result["works"]
+            data = {
+                "tag_params": config.get("tag_params"),
+                "count": len(works),
+                "first_code": works[0].get("code") if works else None,
+            }
+            log_test(config["name"], True, f"找到 {len(works)} 个作品", data)
+        else:
+            log_test(config["name"], False, f"未找到作品")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_actor_works_full_image_test(config: dict):
+    """运行演员作品全量+图片测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        result = get_actor_works_full_by_page(
+            config["actor_id"],
+            max_pages=1,
+            page=config.get("page", 1)
+        )
+        
+        if result and result.get("works"):
+            works = result["works"]
+            total_images = 0
+            
+            for work in works:
+                video_id = work.get("video_id")
+                if video_id:
+                    success, total = download_video_images(video_id, TEST_IMAGES_DIR)
+                    total_images += total
+            
+            data = {
+                "actor_id": config["actor_id"],
+                "actor_name": config.get("actor_name"),
+                "total_works": len(works),
+                "total_images": total_images,
+            }
+            log_test(config["name"], True, f"下载 {total_images} 张图片", data)
+        else:
+            log_test(config["name"], False, f"未找到作品")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_hd_preview_download_test(config: dict):
+    """运行高清预览图下载测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        detail = get_video_detail(config["video_id"], download_images=True)
+        
+        if detail:
+            images = detail.get("thumbnail_images", [])
+            data = {
+                "video_id": config["video_id"],
+                "code": config.get("code"),
+                "title": detail.get("title", "")[:50],
+                "images_count": len(images),
+                "downloaded": True,
+            }
+            log_test(config["name"], True, f"下载 {len(images)} 张高清预览图", data)
+        else:
+            log_test(config["name"], False, f"未找到视频")
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_login_test(config: dict):
+    """运行登录测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        from lib import JavdbLogin
+        
+        login = JavdbLogin()
+        
+        if config.get("auto_login", False):
+            # 自动登录（打开浏览器）
+            print("启动自动登录助手...")
+            from lib import auto_login
+            success = auto_login(timeout=300)
+            
+            if success:
+                data = {
+                    "method": "auto_login",
+                    "success": True,
+                }
+                log_test(config["name"], True, "自动登录成功", data)
+            else:
+                log_test(config["name"], False, "自动登录失败或超时")
+        else:
+            # 检查登录状态
+            if login.load_cookies():
+                if login.check_login_status():
+                    data = {
+                        "method": "check_status",
+                        "success": True,
+                        "logged_in": True,
+                    }
+                    log_test(config["name"], True, "登录状态有效", data)
+                else:
+                    data = {
+                        "method": "check_status",
+                        "success": False,
+                        "logged_in": False,
+                    }
+                    log_test(config["name"], False, "登录状态无效，需要重新登录", data)
+            else:
+                data = {
+                    "method": "check_status",
+                    "success": False,
+                    "logged_in": False,
+                    "error": "未找到 cookies 文件",
+                }
+                log_test(config["name"], False, "未找到 cookies 文件", data)
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
+
+
+def run_tag_manager_test(config: dict):
+    """运行标签管理测试"""
+    print(f"\n{'=' * 70}")
+    print(f"🧪 {config['name']}")
+    print(f"{'=' * 70}")
+    
+    try:
+        # 测试1: 通过名称查询标签
+        if "tag_name" in config:
+            tag = get_tag_by_name(config["tag_name"])
+            
+            if tag:
+                expected_id = config.get("expected_id")
+                if expected_id and tag.get("id") != expected_id:
+                    log_test(config["name"], False, 
+                            f"标签ID不匹配: 预期 {expected_id}, 实际 {tag.get('id')}")
+                    return
+                
+                data = {
+                    "tag_name": config["tag_name"],
+                    "tag_id": tag.get("id"),
+                    "tag_category": tag.get("category"),
+                    "tag_value": tag.get("value"),
+                }
+                log_test(config["name"], True, 
+                        f"找到标签: {tag.get('name')} ({tag.get('id')})", data)
+            else:
+                log_test(config["name"], False, 
+                        f"未找到标签: {config['tag_name']}")
+        
+        # 测试2: 通过ID查询标签
+        elif "tag_id" in config:
+            tag = get_tag_by_id(config["tag_id"])
+            
+            if tag:
+                expected_name = config.get("expected_name")
+                if expected_name and tag.get("name") != expected_name:
+                    log_test(config["name"], False, 
+                            f"标签名称不匹配: 预期 {expected_name}, 实际 {tag.get('name')}")
+                    return
+                
+                data = {
+                    "tag_id": config["tag_id"],
+                    "tag_name": tag.get("name"),
+                    "tag_category": tag.get("category"),
+                    "tag_value": tag.get("value"),
+                }
+                log_test(config["name"], True, 
+                        f"找到标签: {tag.get('name')} ({tag.get('id')})", data)
+            else:
+                log_test(config["name"], False, 
+                        f"未找到标签ID: {config['tag_id']}")
+        
+        # 测试3: 关键词搜索
+        elif "keyword" in config:
+            tags = search_tags_by_keyword(config["keyword"])
+            
+            if tags:
+                data = {
+                    "keyword": config["keyword"],
+                    "found_count": len(tags),
+                    "tags": [{"name": t.get("name"), "id": t.get("id")} for t in tags[:5]],
+                }
+                log_test(config["name"], True, 
+                        f"找到 {len(tags)} 个匹配标签", data)
+            else:
+                log_test(config["name"], False, 
+                        f"未找到匹配关键词的标签: {config['keyword']}")
+        else:
+            log_test(config["name"], False, "未知的测试类型")
+            
+    except Exception as e:
+        log_test(config["name"], False, f"异常: {str(e)}")
 
 
 if __name__ == "__main__":

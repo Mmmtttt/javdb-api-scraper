@@ -1,318 +1,442 @@
-# 测试说明
+# JAVDB API 测试系统使用说明
 
-本目录包含 JAVDB API 的验证测试脚本。
+## 概述
 
-## 文件列表
+测试系统提供了完整的测试框架，支持配置化测试、结果保存和详细日志。
 
-| 文件 | 说明 |
-|------|------|
-| `verify_api.py` | 完整 API 验证测试（推荐） |
-| `test_all_apis.py` | API 功能测试 |
-| `test_tags_final.py` | 标签功能测试 |
+## 文件结构
 
-## verify_api.py 详细说明
+```
+test/
+├── README.md              # 本文档
+├── verify_api.py          # 原始验证测试（保留）
+├── output/               # 测试结果输出目录
+│   ├── test_results_*.json  # JSON 格式结果
+│   └── test_results_*.txt   # 文本格式结果
+test_config.py          # 测试配置文件
+test_runner.py          # 测试运行器
+```
 
-### 测试概览
+## 快速开始
 
-| 序号 | 测试名称 | 函数 | 代码行 |
-|------|----------|------|--------|
-| 1 | 视频详情抓取 | `test_1_get_video_detail()` | L140-165 |
-| 2 | 番号搜索 | `test_2_get_video_by_code()` | L168-190 |
-| 3 | 演员搜索 | `test_3_search_actor()` | L193-226 |
-| 4 | 演员作品（分页） | `test_4_get_actor_works_by_page()` | L229-266 |
-| 5 | 演员作品全量（分页） | `test_5_get_actor_works_full_by_page()` | L269-308 |
-| 6 | 标签搜索 | `test_6_search_by_tags()` | L311-342 |
-| 7 | 标签搜索全量 | `test_7_search_by_tags_full()` | L345-378 |
-| 8 | 标签管理 | `test_8_tag_manager()` | L381-418 |
-| 9 | 图片下载 | `test_9_image_download()` | L421-458 |
+### 1. 配置测试
 
-### 测试详情
+编辑 `test_config.py` 文件，配置你要运行的测试：
 
-#### 测试1: get_video_detail - 视频详情抓取
-
-**代码位置**: L140-165
-
-**测试API**: `get_video_detail(video_id, download_images)`
-
-**测试方法**:
 ```python
-detail = get_video_detail("YwG8Ve", download_images=False)
-```
+# 视频详情测试
+VIDEO_DETAIL_TESTS = [
+    {
+        "name": "测试视频详情 - 永野一夏作品",
+        "video_id": "YwG8Ve",
+        "download_images": False,
+        "enabled": True,  # 启用此测试
+    },
+]
 
-**验证字段**:
-- `video_id`: 视频 ID
-- `code`: 番号 (MIDA-583)
-- `title`: 标题
-- `date`: 日期
-- `actors`: 演员列表
-- `tags`: 标签列表
-- `magnets`: 磁力链接列表
-
-**预期返回格式**:
-```json
-{
-  "video_id": "YwG8Ve",
-  "code": "MIDA-583",
-  "title": "エッチ覚醒4本番...",
-  "date": "2026-03-04",
-  "actors": ["井上もも"],
-  "tags": ["美少女電影", "單體作品", ...],
-  "magnets": [{"magnet": "magnet:?", "size_text": "5.27GB"}]
-}
-```
-
----
-
-#### 测试2: get_video_by_code - 番号搜索
-
-**代码位置**: L168-190
-
-**测试API**: `get_video_by_code(code)`
-
-**测试方法**:
-```python
-detail = get_video_by_code("MIDA-583")
-```
-
-**验证逻辑**:
-1. 搜索番号 "MIDA-583"
-2. 返回第一个匹配结果的详情
-3. 验证返回格式与 `get_video_detail` 相同
-
----
-
-#### 测试3: search_actor - 演员搜索
-
-**代码位置**: L193-226
-
-**测试API**: `search_actor(actor_name)`
-
-**测试方法**:
-```python
-actors = search_actor("井上もも")
-```
-
-**验证字段**:
-- `actor_name`: 演员名称
-- `actor_id`: 演员 ID (0R1n3)
-- `actor_url`: 演员页面 URL
-
-**预期返回格式**:
-```json
-[
-  {
-    "actor_name": "井上もも",
-    "actor_id": "0R1n3",
-    "actor_url": "https://javdb.com/actors/0R1n3"
-  }
+# 标签筛选测试
+TAG_FILTER_TESTS = [
+    {
+        "name": "测试标签筛选 - 永野一夏的'美少女'标签作品",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "tag_names": ["美少女"],
+        "max_pages": 1,
+        "get_details": True,
+        "download_images": False,
+        "save_temp": True,
+        "enabled": True,
+    },
 ]
 ```
 
----
-
-#### 测试4: get_actor_works_by_page - 演员作品（分页）
-
-**代码位置**: L229-266
-
-**测试API**: `get_actor_works_by_page(actor_id, page)`
-
-**测试方法**:
-```python
-result = get_actor_works_by_page("0R1n3", page=1)
-```
-
-**验证字段**:
-- `page`: 当前页码
-- `has_next`: 是否有下一页
-- `works`: 作品列表
-
-**预期返回格式**:
-```json
-{
-  "page": 1,
-  "has_next": false,
-  "works": [
-    {
-      "video_id": "YwG8Ve",
-      "code": "MIDA-583",
-      "title": "作品标题",
-      "date": "2026-03-04",
-      "rating": "4.57分"
-    }
-  ]
-}
-```
-
----
-
-#### 测试5: get_actor_works_full_by_page - 演员作品全量（分页）
-
-**代码位置**: L269-308
-
-**测试API**: `get_actor_works_full_by_page(actor_id, page, download_images)`
-
-**测试方法**:
-```python
-result = get_actor_works_full_by_page("0R1n3", page=1, download_images=False)
-```
-
-**验证逻辑**:
-1. 获取演员作品列表
-2. 逐个获取作品详情
-3. 验证每个作品包含完整信息（tags, actors, magnets 等）
-
----
-
-#### 测试6: search_by_tags - 标签搜索
-
-**代码位置**: L311-342
-
-**测试API**: `search_by_tags(page, **tags)`
-
-**测试方法**:
-```python
-result = search_by_tags(page=1, c3=78)  # 水手服
-```
-
-**验证字段**:
-- `page`: 当前页码
-- `has_next`: 是否有下一页
-- `works`: 作品列表（基础信息）
-
-**标签参数说明**:
-- `c1`: 主題
-- `c2`: 角色
-- `c3`: 服裝 (78 = 水手服)
-- `c4`: 體型 (17 = 巨乳)
-- `c5`: 行爲 (18 = 中出)
-- ...
-
----
-
-#### 测试7: search_by_tags_full - 标签搜索全量
-
-**代码位置**: L345-378
-
-**测试API**: `search_by_tags_full(page, download_images, **tags)`
-
-**测试方法**:
-```python
-result = search_by_tags_full(page=1, c3=78, download_images=False)
-```
-
-**验证逻辑**:
-1. 按标签搜索作品
-2. 逐个获取作品详情
-3. 验证返回完整信息
-
----
-
-#### 测试8: tag_manager - 标签管理
-
-**代码位置**: L381-418
-
-**测试API**:
-- `get_tag_info(category, tag_id)` - L391-398
-- `search_tag_by_name(name)` - L400-408
-- `get_category_list()` - L410-418
-
-**测试方法**:
-```python
-# 查询标签
-tag = get_tag_info("c3", 78)  # 返回: 水手服
-
-# 搜索标签
-results = search_tag_by_name("巨乳")
-
-# 获取分类
-categories = get_category_list()
-```
-
----
-
-#### 测试9: image_download - 图片下载
-
-**代码位置**: L421-458
-
-**测试方法**:
-```python
-# 获取视频详情（包含缩略图链接）
-detail = get_video_detail("YwG8Ve", download_images=True)
-
-# 手动下载测试
-from utils import ImageDownloader
-downloader = ImageDownloader(session)
-downloaded = downloader.download_thumbnails(code, image_urls)
-```
-
-**验证逻辑**:
-1. 获取缩略图链接列表
-2. 调用下载器下载图片
-3. 验证图片保存到正确目录
-
-**输出目录**: `test/output/images/{code}/`
-
----
-
-## 运行测试
+### 2. 运行测试
 
 ```bash
-# 进入项目目录
-cd d:\code\javdb\javdb-api-scraper
+# 运行所有启用的测试
+python test_runner.py
 
-# 运行验证测试
-python test/verify_api.py
+# 列出所有测试项
+python test_runner.py --list
+
+# 只运行视频相关测试
+python test_runner.py --video
+
+# 只运行演员相关测试
+python test_runner.py --actor
+
+# 只运行标签相关测试
+python test_runner.py --tag
+
+# 只运行磁力链接测试
+python test_runner.py --magnet
+
+# 只运行图片下载测试
+python test_runner.py --image
 ```
 
-## 测试输出
+### 3. 查看结果
 
-测试结果保存在 `test/output/json/test_results.json`:
+测试结果会保存在 `test/output/` 目录：
+
+- `test_results_YYYYMMDD_HHMMSS.json` - JSON 格式结果
+- `test_results_YYYYMMDD_HHMMSS.txt` - 文本格式结果
+
+## 配置说明
+
+### 测试配置
+
+所有测试配置都在 `test_config.py` 中：
+
+| 配置项 | 说明 |
+|--------|------|
+| `VIDEO_DETAIL_TESTS` | 视频详情测试 |
+| `CODE_SEARCH_TESTS` | 番号搜索测试 |
+| `VIDEO_SEARCH_TESTS` | 视频搜索测试 |
+| `ACTOR_SEARCH_TESTS` | 演员搜索测试 |
+| `ACTOR_WORKS_TESTS` | 演员作品测试 |
+| `TAG_FILTER_TESTS` | 标签筛选测试 |
+| `TAG_SEARCH_TESTS` | 标签搜索测试 |
+| `MAGNET_TESTS` | 磁力链接测试 |
+| `IMAGE_DOWNLOAD_TESTS` | 图片下载测试 |
+
+每个测试项包含以下字段：
+
+- `name`: 测试名称
+- `enabled`: 是否启用此测试
+- 其他特定参数（如 `video_id`, `actor_id`, `tag_names` 等）
+
+### 结果保存配置
+
+```python
+RESULT_CONFIG = {
+    "save_results": True,  # 是否保存测试结果
+    "output_dir": "test/output",  # 结果输出目录
+    "save_json": True,  # 是否保存 JSON 格式结果
+    "save_text": True,  # 是否保存文本格式结果
+    "include_timestamp": True,  # 文件名是否包含时间戳
+    "verbose": True,  # 是否输出详细信息
+}
+```
+
+### 其他配置
+
+```python
+# 超时设置
+TIMEOUT_CONFIG = {
+    "request_timeout": 30,  # 单个请求超时时间（秒）
+    "test_timeout": 300,  # 整个测试超时时间（秒）
+}
+
+# 重试配置
+RETRY_CONFIG = {
+    "max_retries": 3,  # 最大重试次数
+    "retry_delay": 2,  # 重试延迟（秒）
+}
+
+# 日志配置
+LOG_CONFIG = {
+    "log_level": "INFO",  # 日志级别: DEBUG, INFO, WARNING, ERROR
+    "log_to_file": True,  # 是否记录到文件
+    "log_file": "test/test.log",  # 日志文件路径
+}
+```
+
+## 测试类型说明
+
+### 1. 视频详情测试
+
+测试获取视频详情信息：
+
+```python
+VIDEO_DETAIL_TESTS = [
+    {
+        "name": "测试视频详情",
+        "video_id": "YwG8Ve",
+        "download_images": False,
+        "enabled": True,
+    },
+]
+```
+
+### 2. 番号搜索测试
+
+测试根据番号搜索视频：
+
+```python
+CODE_SEARCH_TESTS = [
+    {
+        "name": "测试番号搜索",
+        "code": "MIDA-583",
+        "enabled": True,
+    },
+]
+```
+
+### 3. 视频搜索测试
+
+测试关键词搜索视频：
+
+```python
+VIDEO_SEARCH_TESTS = [
+    {
+        "name": "测试视频搜索",
+        "keyword": "SSIS",
+        "max_pages": 1,
+        "enabled": True,
+    },
+]
+```
+
+### 4. 演员搜索测试
+
+测试搜索演员：
+
+```python
+ACTOR_SEARCH_TESTS = [
+    {
+        "name": "测试演员搜索",
+        "actor_name": "井上もも",
+        "enabled": True,
+    },
+]
+```
+
+### 5. 演员作品测试
+
+测试获取演员作品：
+
+```python
+ACTOR_WORKS_TESTS = [
+    {
+        "name": "测试演员作品",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "max_pages": 1,
+        "get_details": False,
+        "download_images": False,
+        "enabled": True,
+    },
+]
+```
+
+### 6. 标签筛选测试
+
+测试按标签筛选演员作品：
+
+```python
+TAG_FILTER_TESTS = [
+    {
+        "name": "测试标签筛选",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "tag_names": ["美少女"],
+        "max_pages": 1,
+        "get_details": True,
+        "download_images": False,
+        "save_temp": True,
+        "enabled": True,
+    },
+]
+```
+
+### 7. 标签搜索测试
+
+测试搜索标签作品：
+
+```python
+TAG_SEARCH_TESTS = [
+    {
+        "name": "测试标签搜索",
+        "tag_id": "c1=23",
+        "max_pages": 1,
+        "enabled": True,
+    },
+]
+```
+
+### 8. 磁力链接测试
+
+测试获取磁力链接：
+
+```python
+MAGNET_TESTS = [
+    {
+        "name": "测试磁力链接",
+        "video_id": "YwG8Ve",
+        "enabled": True,
+    },
+]
+```
+
+### 9. 图片下载测试
+
+测试下载视频图片：
+
+```python
+IMAGE_DOWNLOAD_TESTS = [
+    {
+        "name": "测试图片下载",
+        "video_id": "YwG8Ve",
+        "download_dir": None,  # None 表示使用默认目录
+        "enabled": True,
+    },
+]
+```
+
+## 结果格式
+
+### JSON 格式
 
 ```json
 {
-  "total": 12,
-  "passed": 12,
-  "failed": 0,
-  "timestamp": "2026-03-01 03:17:07",
-  "tests": [
+  "timestamp": "2026-03-02T10:30:00",
+  "total_tests": 5,
+  "passed_tests": 4,
+  "failed_tests": 1,
+  "results": [
     {
-      "test": "get_video_detail",
-      "passed": true,
-      "message": "成功获取: MIDA-583..."
+      "test_name": "测试视频详情",
+      "test_type": "video_detail",
+      "success": true,
+      "error": null,
+      "duration": 1.23,
+      "message": "测试成功",
+      "data": {
+        "video_id": "YwG8Ve",
+        "code": "MIDA-583",
+        "title": "作品标题...",
+        "date": "2026-03-04",
+        "tags_count": 8,
+        "magnets_count": 2
+      },
+      "start_time": "2026-03-02T10:30:00",
+      "end_time": "2026-03-02T10:30:01"
     }
   ]
 }
 ```
 
-## 测试数据
+### 文本格式
 
-测试使用的固定数据（L55-62）:
+```
+======================================================================
+JAVDB API 测试结果
+======================================================================
 
-```python
-TEST_DATA = {
-    "video_id": "YwG8Ve",      # 测试视频 ID
-    "code": "MIDA-583",        # 测试番号
-    "actor_name": "井上もも",   # 测试演员
-    "actor_id": "0R1n3",       # 演员 ID
-    "tag_c3": 78,              # 标签 ID (水手服)
-    "tag_name": "水手服",       # 标签名称
-}
+时间: 2026-03-02 10:30:00
+总测试数: 5
+通过: 4
+失败: 1
+
+----------------------------------------------------------------------
+测试: 测试视频详情
+类型: video_detail
+状态: ✅ 通过
+耗时: 1.23秒
+数据: {"video_id": "YwG8Ve", "code": "MIDA-583", ...}
 ```
 
-## 验证函数
+## 自动化登录
 
-### validate_video_detail()
+### 使用方式 1: 直接粘贴 Session 值（推荐）
 
-**代码位置**: L106-135
+1. 运行 `python test_runner.py`
+2. 如果需要登录，浏览器会自动打开登录助手页面
+3. 在浏览器中登录 JAVDB
+4. 按 F12 打开开发者工具，找到 `_jdb_session` 的值
+5. 复制并粘贴到助手的"Session 值"标签页
+6. 点击"提交 Session"
 
-**功能**: 验证视频详情返回格式是否正确
+### 使用方式 2: 完整 Cookies
 
-**检查字段**:
-- `video_id`, `code`, `title`, `date`, `actors`, `tags`, `magnets`
-- 验证 `actors`, `tags`, `magnets` 是否为列表类型
+1. 在浏览器开发者工具中，复制所有 cookies
+2. 粘贴到助手的"完整 Cookies"标签页
+3. 点击"提交 Cookies"
 
-### log_test()
+### 使用方式 3: 上传截图
 
-**代码位置**: L88-103
+1. 截图登录成功的页面
+2. 在助手的"上传截图"标签页，选择图片
+3. 点击"提交截图"
+4. 图片会保存到 `output/screenshots/` 目录
 
-**功能**: 记录并输出测试结果
+## 常见问题
+
+### Q: 如何只运行某个测试？
+
+A: 在 `test_config.py` 中，将对应测试的 `enabled` 字段设置为 `True`，其他设置为 `False`。
+
+### Q: 测试结果保存在哪里？
+
+A: 默认保存在 `test/output/` 目录，可以在 `RESULT_CONFIG` 中修改。
+
+### Q: 如何增加新的测试？
+
+A: 在 `test_config.py` 中添加新的测试项，然后在 `test_runner.py` 中添加对应的测试函数。
+
+### Q: 测试失败怎么办？
+
+A: 检查：
+1. 网络连接是否正常
+2. cookies 是否有效（如果需要登录）
+3. 测试参数是否正确（如 video_id, actor_id 等）
+4. 查看 `test/test.log` 日志文件
+
+## 示例
+
+### 示例 1: 测试单个演员的标签筛选
+
+```python
+# test_config.py
+TAG_FILTER_TESTS = [
+    {
+        "name": "测试永野一夏的美少女作品",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "tag_names": ["美少女"],
+        "max_pages": 1,
+        "get_details": True,
+        "download_images": False,
+        "save_temp": True,
+        "enabled": True,
+    },
+]
+
+# 其他测试都禁用
+VIDEO_DETAIL_TESTS = []
+CODE_SEARCH_TESTS = []
+# ...
+```
+
+运行：
+```bash
+python test_runner.py --tag
+```
+
+### 示例 2: 批量测试多个演员
+
+```python
+# test_config.py
+ACTOR_WORKS_TESTS = [
+    {
+        "name": "测试演员1",
+        "actor_id": "0R1n3",
+        "actor_name": "井上もも",
+        "max_pages": 1,
+        "enabled": True,
+    },
+    {
+        "name": "测试演员2",
+        "actor_id": "NeOr",
+        "actor_name": "永野一夏",
+        "max_pages": 1,
+        "enabled": True,
+    },
+]
+```
+
+运行：
+```bash
+python test_runner.py --actor
+```
