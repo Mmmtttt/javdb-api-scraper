@@ -10,8 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -25,6 +23,10 @@ venv/
 ENV/
 env/
 .venv/
+# Ignore virtual environment lib directories (but not project lib/)
+venv/*/lib/
+env/*/lib/
+.venv/*/lib/
 
 # IDE
 .idea/

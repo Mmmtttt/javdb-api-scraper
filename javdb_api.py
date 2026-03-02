@@ -591,6 +591,138 @@ class JavdbAPI:
         
         return works
     
+    def get_actor_works_with_tags(self, actor_id: str, tag_names: List[str] = None,
+                                tag_ids: List[str] = None, max_pages: int = 10,
+                                get_details: bool = False, download_images: bool = False,
+                                save_temp: bool = True, temp_file: str = None) -> Dict:
+        """
+        获取演员的所有作品并按标签筛选
+        
+        原理: 先获取演员的所有作品全量信息，保存到临时文件，然后筛选出带有指定标签的作品
+        
+        Args:
+            actor_id: 演员 ID
+            tag_names: 标签名称列表（如 ['水手服', '美少女']）
+            tag_ids: 标签ID列表（如 ['c1=23', 'c3=78']），与 tag_names 二选一
+            max_pages: 最大爬取页数
+            get_details: 是否获取详情
+            download_images: 是否下载缩略图
+            save_temp: 是否保存临时文件
+            temp_file: 临时文件路径，如果为 None 则自动生成
+            
+        Returns:
+            {
+                'total_works': 总作品数,
+                'filtered_works': 筛选后的作品数,
+                'works': 筛选后的作品列表,
+                'tags': 使用的标签,
+                'temp_file': 临时文件路径
+            }
+        """
+        import json
+        from pathlib import Path
+        
+        # 标准化标签参数
+        if tag_ids:
+            tags = tag_ids
+        elif tag_names:
+            tags = tag_names
+        else:
+            tags = []
+        
+        # 生成临时文件路径
+        if not temp_file:
+            temp_file = f"temp_actor_{actor_id}_works.json"
+        
+        temp_path = Path(temp_file)
+        
+        # 检查临时文件是否存在
+        if temp_path.exists():
+            print(f"从临时文件加载: {temp_file}")
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                all_works = json.load(f)
+            all_works = all_works.get('works', [])
+        else:
+            # 获取所有作品
+            # 如果需要标签筛选，必须获取详细信息（因为基础信息中没有标签）
+            need_details = get_details or (tags and len(tags) > 0)
+            print(f"获取演员 {actor_id} 的所有作品...")
+            all_works = self.get_actor_works(actor_id, max_pages, need_details, download_images)
+            
+            # 保存到临时文件
+            if save_temp:
+                temp_data = {
+                    'actor_id': actor_id,
+                    'total_works': len(all_works),
+                    'works': all_works,
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(temp_data, f, indent=2, ensure_ascii=False)
+                print(f"已保存 {len(all_works)} 个作品到临时文件: {temp_file}")
+        
+        # 筛选作品
+        if not tags:
+            return {
+                'total_works': len(all_works),
+                'filtered_works': len(all_works),
+                'works': all_works,
+                'tags': [],
+                'temp_file': str(temp_path) if temp_path.exists() else None
+            }
+        
+        print(f"按标签筛选: {tags}")
+        filtered_works = []
+        
+        for work in all_works:
+            work_tags = work.get('tags', [])
+            
+            # 检查是否包含所有指定的标签
+            if isinstance(work_tags, list):
+                # 如果 tag_ids 格式是 ['c1=23', 'c3=78']
+                if tag_ids:
+                    tag_match = True
+                    for tag_id in tag_ids:
+                        tag_key, tag_value = tag_id.split('=')
+                        found = False
+                        for tag in work_tags:
+                            tag_str = str(tag)
+                            if tag_key == 'c1' and tag_value in tag_str:
+                                found = True
+                                break
+                            elif tag_key == 'c2' and tag_value in tag_str:
+                                found = True
+                                break
+                            elif tag_key == 'c3' and tag_value in tag_str:
+                                found = True
+                                break
+                            elif tag_key == 'c4' and tag_value in tag_str:
+                                found = True
+                                break
+                            elif tag_key == 'c5' and tag_value in tag_str:
+                                found = True
+                                break
+                        if not found:
+                            tag_match = False
+                            break
+                    if tag_match:
+                        filtered_works.append(work)
+                # 如果 tag_names 格式是 ['水手服', '美少女']
+                elif tag_names:
+                    tag_match = all(tag in str(work_tags) for tag in tag_names)
+                    if tag_match:
+                        filtered_works.append(work)
+        
+        print(f"筛选结果: {len(filtered_works)}/{len(all_works)} 个作品")
+        
+        return {
+            'total_works': len(all_works),
+            'filtered_works': len(filtered_works),
+            'works': filtered_works,
+            'tags': tags,
+            'temp_file': str(temp_path) if temp_path.exists() else None
+        }
+    
     def _parse_work_item(self, item) -> Optional[Dict]:
         """解析作品项"""
         try:

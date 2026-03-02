@@ -128,6 +128,59 @@ success = login()
 success = ensure_login()
 ```
 
+### 使用自动化登录（推荐）
+
+```python
+from lib import auto_login
+
+# 自动化登录（打开浏览器，手动登录后自动保存 cookies）
+success = auto_login(timeout=300)  # 等待 5 分钟
+
+# 流程：
+# 1. 自动打开浏览器，显示登录助手页面
+# 2. 在页面中点击按钮打开 JAVDB 登录页
+# 3. 在 JAVDB 中完成登录
+# 4. 从浏览器复制 cookies 并粘贴到助手页面
+# 5. 提交后自动保存到 cookies.json
+```
+
+### 演员作品标签筛选
+
+```python
+from javdb_api import JavdbAPI
+
+api = JavdbAPI()
+
+# 获取演员作品并按标签筛选
+result = api.get_actor_works_with_tags(
+    actor_id="NeOr",  # 永野一夏
+    tag_names=["美少女"],  # 按标签名称筛选
+    max_pages=1,
+    get_details=True,  # 获取详细信息（包含标签）
+    save_temp=True  # 保存到临时文件
+)
+
+print(f"总作品: {result['total_works']}")
+print(f"筛选后: {result['filtered_works']}")
+print(f"筛选标签: {result['tags']}")
+
+# 筛选后的作品
+for work in result['works']:
+    print(f"{work['code']}: {work['title']}")
+
+# 也可以使用标签 ID 筛选
+result = api.get_actor_works_with_tags(
+    actor_id="NeOr",
+    tag_ids=["c1=23", "c3=78"],  # 多标签组合
+    max_pages=1
+)
+
+# 临时文件机制：
+# - 首次运行会获取所有作品并保存到临时文件
+# - 后续运行会从临时文件加载，避免重复请求
+# - 如需重新获取，删除临时文件或使用不同的 temp_file 参数
+```
+
 ## API 参考
 
 ### 视频相关
