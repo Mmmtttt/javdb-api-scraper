@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AV 在线播放器</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d0d1f 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: #8892b0;
+            font-size: 1rem;
+        }
+        
+        .search-section {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .source-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .source-btn {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #8892b0;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .source-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .source-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            color: #fff;
+        }
+        
+        .source-btn .source-name {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .source-btn .source-desc {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 18px 24px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #fff;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .search-box input:focus {
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .search-box input::placeholder {
+            color: #8892b0;
+        }
+        
+        .btn {
+            padding: 18px 40px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .status.loading {
+            display: block;
+            background: rgba(33, 150, 243, 0.2);
+            border: 1px solid rgba(33, 150, 243, 0.5);
+            color: #64b5f6;
+        }
+        
+        .status.error {
+            display: block;
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #ef5350;
+        }
+        
+        .status.success {
+            display: block;
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #66bb6a;
+        }
+        
+        .player-section {
+            max-width: 1200px;
+            margin: 0 auto 40px;
+            display: none;
+        }
+        
+        .player-section.active {
+            display: block;
+        }
+        
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .video-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .video-info h2 {
+            font-size: 1.5rem;
+        }
+        
+        .video-info .source-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+        
+        .quality-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .quality-selector label {
+            color: #8892b0;
+        }
+        
+        .quality-selector select {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        .quality-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .tips {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 12px;
+        }
+        
+        .tips h3 {
+            color: #ffc107;
+            margin-bottom: 10px;
+        }
+        
+        .tips ul {
+            margin-left: 20px;
+            color: #8892b0;
+            line-height: 1.8;
+        }
+        
+        .source-comparison {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        
+        .source-comparison table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .source-comparison th,
+        .source-comparison td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .source-comparison th {
+            background: rgba(102, 126, 234, 0.2);
+            color: #667eea;
+        }
+        
+        .source-comparison tr:last-child td {
+            border-bottom: none;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #8892b0;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎬 AV 在线播放器</h1>
+        <p class="subtitle">多源支持 | 输入番号，即刻观看</p>
+    </header>
+    
+    <div class="container">
+        <section class="search-section">
+            <div class="source-selector">
+                <button class="source-btn active" data-source="missav" onclick="selectSource('missav')">
+                    <span class="source-name">MissAV</span>
+                    <span class="source-desc">资源丰富 | 多画质</span>
+                </button>
+                <button class="source-btn" data-source="jable" onclick="selectSource('jable')">
+                    <span class="source-name">Jable</span>
+                    <span class="source-desc">中文字幕 | 1080p</span>
+                </button>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" id="avidInput" placeholder="输入番号，如 SSIS-865" 
+                       onkeypress="if(event.key==='Enter') search()">
+                <button class="btn" id="searchBtn" onclick="search()">播放</button>
+            </div>
+            <div id="status" class="status"></div>
+        </section>
+        
+        <section class="player-section" id="playerSection">
+            <div class="video-wrapper">
+                <video id="video" controls></video>
+            </div>
+            <div class="video-info">
+                <h2>
+                    <span id="videoTitle">-</span>
+                    <span class="source-badge" id="sourceBadge">-</span>
+                </h2>
+                <div class="quality-selector">
+                    <label>画质：</label>
+                    <select id="qualitySelect" onchange="changeQuality()">
+                        <option value="-1">自动</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+        
+        <section class="source-comparison">
+            <table>
+                <thead>
+                    <tr>
+                        <th>数据源</th>
+                        <th>特点</th>
+                        <th>画质</th>
+                        <th>推荐场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>MissAV</strong></td>
+                        <td>资源最全，更新快</td>
+                        <td>720p / 480p</td>
+                        <td>日常观看</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Jable</strong></td>
+                        <td>中文字幕多</td>
+                        <td>1080p</td>
+                        <td>需要字幕</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        
+        <section class="tips">
+            <h3>💡 使用提示</h3>
+            <ul>
+                <li>MissAV 资源最全，但画质最高 720p</li>
+                <li>Jable 有很多中文字幕，画质可达 1080p</li>
+                <li>如果一个源找不到，试试另一个</li>
+                <li>输入完整的番号（如 SSIS-865、ABW-123）</li>
+            </ul>
+        </section>
+    </div>
+    
+    <footer>
+        <p>仅供学习研究使用 | 请遵守当地法律法规</p>
+    </footer>
+    
+    <script>
+        let hls = null;
+        let currentStreams = [];
+        let currentSource = 'missav';
+        
+        function selectSource(source) {
+            currentSource = source;
+            
+            document.querySelectorAll('.source-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-source="${source}"]`).classList.add('active');
+            
+            const input = document.getElementById('avidInput');
+            if (source === 'jable') {
+                input.placeholder = '输入番号，如 SSIS-865（Jable有中文字幕）';
+            } else {
+                input.placeholder = '输入番号，如 SSIS-865';
+            }
+        }
+        
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = type === 'loading' 
+                ? `<span class="spinner"></span>${message}` 
+                : message;
+            statusEl.className = 'status ' + type;
+        }
+        
+        function hideStatus() {
+            document.getElementById('status').className = 'status';
+        }
+        
+        async function search() {
+            const avid = document.getElementById('avidInput').value.trim().toUpperCase();
+            
+            if (!avid) {
+                showStatus('请输入番号', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('searchBtn');
+            btn.disabled = true;
+            
+            const sourceName = currentSource === 'jable' ? 'Jable' : 'MissAV';
+            showStatus(`正在从 ${sourceName} 搜索 ${avid} ...`, 'loading');
+            
+            try {
+                const response = await fetch(`/api/extract/${avid}?source=${currentSource}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showStatus(data.error + ' (试试另一个数据源？)', 'error');
+                    btn.disabled = false;
+                    return;
+                }
+                
+                showStatus('找到视频源，正在加载...', 'success');
+                
+                currentStreams = data.streams;
+                
+                updateQualitySelector();
+                
+                document.getElementById('videoTitle').textContent = avid;
+                document.getElementById('sourceBadge').textContent = data.source;
+                document.getElementById('playerSection').classList.add('active');
+                
+                const bestStream = currentStreams[0];
+                playVideo(bestStream.proxy_url);
+                
+                setTimeout(hideStatus, 2000);
+                
+            } catch (error) {
+                showStatus('请求失败: ' + error.message, 'error');
+            }
+            
+            btn.disabled = false;
+        }
+        
+        function updateQualitySelector() {
+            const select = document.getElementById('qualitySelect');
+            select.innerHTML = '<option value="-1">自动</option>';
+            
+            currentStreams.forEach((stream, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                const res = stream.resolution || 'unknown';
+                const bw = stream.bandwidth ? ` (${Math.round(stream.bandwidth/1000)}kbps)` : '';
+                option.textContent = `${res}${bw}`;
+                select.appendChild(option);
+            });
+        }
+        
+        function playVideo(proxyUrl) {
+            const video = document.getElementById('video');
+            
+            if (hls) {
+                hls.destroy();
+            }
+            
+            const fullUrl = proxyUrl.startsWith('http') ? proxyUrl : window.location.origin + proxyUrl;
+            console.log('播放地址:', fullUrl);
+            
+            if (Hls.isSupported()) {
+                hls = new Hls({
+                    debug: false,
+                    enableWorker: true
+                });
+                
+                hls.loadSource(fullUrl);
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('播放列表解析成功');
+                    video.play().catch(e => console.log('自动播放被阻止'));
+                });
+                
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS 错误:', data);
+                    if (data.fatal) {
+                        showStatus('播放错误: ' + data.details, 'error');
+                    }
+                });
+                
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = fullUrl;
+                video.play();
+            }
+        }
+        
+        function changeQuality() {
+            const index = parseInt(document.getElementById('qualitySelect').value);
+            
+            if (index === -1) {
+                if (hls) hls.currentLevel = -1;
+                return;
+            }
+            
+            const stream = currentStreams[index];
+            if (stream) {
+                playVideo(stream.proxy_url);
+            }
+        }
+    </script>
+</body>
+</html>
