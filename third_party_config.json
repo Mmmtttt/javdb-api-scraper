@@ -1,0 +1,12 @@
+{
+  "default_adapter": "javdb",
+  "adapters": {
+    "javdb": {
+      "enabled": true,
+      "domain_index": 0,
+      "timeout": 30,
+      "retry_times": 3,
+      "sleep_time": 0.5
+    }
+  }
+}
