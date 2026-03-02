@@ -56,6 +56,12 @@ TEST_DATA = {
     "tag_name": "水手服",
 }
 
+# 额外的演员测试数据
+EXTRA_ACTORS = [
+    {"name": "井上もも", "id": "0R1n3"},
+    {"name": "永野一夏", "id": "NeOr"},
+]
+
 test_results = []
 
 
@@ -170,33 +176,41 @@ def test_3_search_actor():
     print("测试3: search_actor - 搜索演员")
     print("=" * 70)
     
-    try:
-        actors = search_actor(TEST_DATA["actor_name"])
-        
-        if not actors:
-            log_test("search_actor", False, "返回空列表")
-            return None
-        
-        if not isinstance(actors, list):
-            log_test("search_actor", False, "返回不是列表")
-            return None
-        
-        first_actor = actors[0]
-        required = ["actor_id", "actor_name", "actor_url"]
-        missing = [f for f in required if f not in first_actor]
-        
-        if missing:
-            log_test("search_actor", False, f"缺少字段: {missing}")
-            return None
-        
-        log_test("search_actor", True,
-                f"找到 {len(actors)} 个演员: {first_actor.get('actor_name')} (ID: {first_actor.get('actor_id')})",
-                first_actor)
-        return first_actor
-    except Exception as e:
-        log_test("search_actor", False, f"异常: {str(e)}")
+    all_passed = True
+    results = []
     
-    return None
+    for actor in EXTRA_ACTORS:
+        try:
+            actors = search_actor(actor["name"])
+            
+            if not actors:
+                log_test(f"search_actor ({actor['name']})", False, "返回空列表")
+                all_passed = False
+                continue
+            
+            if not isinstance(actors, list):
+                log_test(f"search_actor ({actor['name']})", False, "返回不是列表")
+                all_passed = False
+                continue
+            
+            first_actor = actors[0]
+            required = ["actor_id", "actor_name", "actor_url"]
+            missing = [f for f in required if f not in first_actor]
+            
+            if missing:
+                log_test(f"search_actor ({actor['name']})", False, f"缺少字段: {missing}")
+                all_passed = False
+                continue
+            
+            log_test(f"search_actor ({actor['name']})", True,
+                    f"找到 {len(actors)} 个演员: {first_actor.get('actor_name')} (ID: {first_actor.get('actor_id')})",
+                    first_actor)
+            results.append(first_actor)
+        except Exception as e:
+            log_test(f"search_actor ({actor['name']})", False, f"异常: {str(e)}")
+            all_passed = False
+    
+    return results if results else None
 
 
 def test_4_get_actor_works_by_page():
