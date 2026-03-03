@@ -21,6 +21,10 @@ JAVDB API 核心模块
 - convert_to_traditional: 简体转换为繁体
 - TagManager: 标签管理器类
 
+图片下载模块:
+- download_video_images: 通用图片下载方法（支持自定义请求头）
+- download_video_detail_images: 获取视频详情并下载所有缩略图
+
 使用示例:
     # 通过标签名称获取标签ID（自动处理简繁转换）
     >>> tag = get_tag_by_name("美少女")
@@ -1976,3 +1980,79 @@ from lib.tag_manager import (
     search_tags_by_keyword,
     convert_to_traditional,
 )
+
+
+# ==================== 图片下载模块 ====================
+
+def download_video_images(video_id: str, image_urls: List[Dict[str, str]], 
+                         output_dir: str = "output/images",
+                         headers: Dict[str, str] = None) -> Dict[str, Any]:
+    """
+    下载视频相关图片（通用方法）
+    
+    支持下载封面、样品图、缩略图等，支持自定义请求头（如 Referer）
+    
+    Args:
+        video_id: 视频 ID 或番号（用于创建子目录）
+        image_urls: 图片信息列表，每项包含:
+            - 'url': 图片 URL（必需）
+            - 'filename': 自定义文件名（可选，默认自动生成）
+            例如: [
+                {'url': 'https://.../cover.jpg', 'filename': 'cover.jpg'},
+                {'url': 'https://.../sample1.jpg', 'filename': 'sample_01.jpg'},
+            ]
+        output_dir: 输出目录，默认为 "output/images"
+        headers: 可选的自定义请求头，例如:
+            {'Referer': 'https://javdb.com/v/xxxxx'}
+            
+    Returns:
+        下载结果统计
+        {
+            'downloaded': 成功下载数量,
+            'total': 总数量,
+            'success_rate': 成功率（百分比）,
+            'download_dir': 下载目录路径,
+            'files': [下载的文件路径列表]
+        }
+    """
+    api = JavdbAPI()
+    return api.image_downloader.download_images(
+        video_id, image_urls, output_dir, headers
+    )
+
+
+def download_video_detail_images(video_id: str, output_dir: str = "output/images") -> Dict[str, Any]:
+    """
+    获取视频详情并下载所有缩略图
+    
+    先获取视频详情，然后自动下载所有缩略图
+    
+    Args:
+        video_id: 视频 ID
+        output_dir: 输出目录
+        
+    Returns:
+        {
+            'detail': 视频详情,
+            'download_result': 下载结果统计
+        }
+    """
+    api = JavdbAPI()
+    detail = api.get_video_detail(video_id)
+    
+    download_result = None
+    if detail.get('thumbnail_images'):
+        image_urls = [
+            {'url': url, 'filename': f"{i:03d}.jpg"}
+            for i, url in enumerate(detail['thumbnail_images'])
+        ]
+        download_result = api.image_downloader.download_images(
+            detail.get('code', video_id),
+            image_urls,
+            output_dir
+        )
+    
+    return {
+        'detail': detail,
+        'download_result': download_result
+    }

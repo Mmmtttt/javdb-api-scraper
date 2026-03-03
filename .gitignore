@@ -1,3 +1,11 @@
+# 测试相关文件
+/test/测试*/
+/test/其他测试/
+/test/javbus/
+/test/images/
+/test/output/
+test_results/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -10,6 +18,8 @@ dist/
 downloads/
 eggs/
 .eggs/
+lib/
+lib64/
 parts/
 sdist/
 var/
@@ -18,46 +28,30 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# 虚拟环境
 venv/
 ENV/
 env/
-.venv/
-# Ignore virtual environment lib directories (but not project lib/)
-venv/*/lib/
-env/*/lib/
-.venv/*/lib/
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
 
-# Sensitive files - DO NOT COMMIT
-cookies.json
-config.py
-
-# Output data
-output/
-!output/.gitkeep
-!output/tags_database.enc
-
-# Test output
-test/output/
-
-# Keep example config
-!config.example.py
-
-# Logs
+# 日志
+logs/
 *.log
 
-# OS
-.DS_Store
-Thumbs.db
+# 临时文件
+temp_*.json
+*.tmp
 
-# Test cache
-.pytest_cache/
-.coverage
-htmlcov/
+# 配置文件（包含敏感信息）
+cookies.json
+config_local.py
+config.py
+
+# 输出目录
+output/
