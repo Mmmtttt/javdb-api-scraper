@@ -856,14 +856,23 @@ class JavdbAPI:
             if rating_elem:
                 rating = rating_elem.get_text(strip=True)
             
-            return {
+            cover_url = ""
+            cover_elem = item.select_one('img.cover, img')
+            if cover_elem:
+                cover_url = cover_elem.get('src', '')
+                cover_url = cover_elem.get('data-src', cover_url)
+            
+            result = {
                 'video_id': video_id,
                 'code': code,
                 'title': title,
                 'date': date,
                 'rating': rating,
                 'url': urljoin(self.base_url, href),
+                'cover_url': cover_url
             }
+            
+            return result
         except:
             return None
     

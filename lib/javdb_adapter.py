@@ -61,7 +61,7 @@ class JavdbAdapter(BaseAdapter):
                         "date": video.get("date", ""),
                         "tags": [],  # 搜索结果不包含标签
                         "actors": [],  # 搜索结果不包含演员
-                        "cover_url": "",  # 搜索结果不包含封面
+                        "cover_url": video.get("cover_url", ""),
                         "rating": video.get("rating", "")
                     })
                 
@@ -186,7 +186,7 @@ class JavdbAdapter(BaseAdapter):
                         "rating": work.get("rating", ""),
                         "tags": [],
                         "actors": [],
-                        "cover_url": ""
+                        "cover_url": work.get("cover_url", "")
                     })
                 
                 has_next = result.get("has_next", False)
@@ -266,7 +266,7 @@ class JavdbAdapter(BaseAdapter):
                         "rating": work.get("rating", ""),
                         "tags": [],
                         "actors": [],
-                        "cover_url": ""
+                        "cover_url": work.get("cover_url", "")
                     })
                 
                 has_next = result.get("has_next", False)
@@ -313,7 +313,7 @@ class JavdbAdapter(BaseAdapter):
                         "rating": work.get("rating", ""),
                         "tags": [],
                         "actors": [],
-                        "cover_url": ""
+                        "cover_url": work.get("cover_url", "")
                     })
                 
                 has_next = result.get("has_next", False)
