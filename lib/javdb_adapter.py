@@ -32,28 +32,31 @@ class JavdbAdapter(BaseAdapter):
         """返回平台类型"""
         return self.platform
     
-    def search_videos(self, keyword: str, max_pages: int = 1) -> List[Dict[str, Any]]:
+    def search_videos(self, keyword: str, page: int = 1, max_pages: int = 1) -> Dict[str, Any]:
         """
         搜索视频
         
         Args:
             keyword: 搜索关键词
+            page: 起始页码
             max_pages: 最大搜索页数
             
         Returns:
-            视频列表
+            包含分页信息和视频列表的字典
         """
         results = []
-        page = 1
+        current_page = page
+        has_next = True
         
-        while page <= max_pages:
+        while current_page < page + max_pages and has_next:
             try:
-                videos = self.api.search_videos(keyword, page=page)
+                result = self.api.search_videos(keyword, page=current_page)
                 
-                if not videos:
+                if not result or not result.get('videos'):
+                    has_next = False
                     break
                 
-                for video in videos:
+                for video in result.get('videos', []):
                     results.append({
                         "video_id": video.get("video_id"),
                         "code": video.get("code", ""),
@@ -65,18 +68,25 @@ class JavdbAdapter(BaseAdapter):
                         "rating": video.get("rating", "")
                     })
                 
-                # 检查是否还有更多页
-                if len(videos) < 40:  # JAVDB 每页通常40个结果
-                    break
+                has_next = result.get("has_next", False)
                 
-                page += 1
-                time.sleep(0.5)  # 避免请求过快
+                if has_next and current_page < page + max_pages - 1:
+                    current_page += 1
+                    time.sleep(0.5)  # 避免请求过快
+                else:
+                    break
                 
             except Exception as e:
                 print(f"搜索失败: {e}")
+                has_next = False
                 break
         
-        return results
+        return {
+            "page": page,
+            "has_next": has_next,
+            "total_pages": None,  # JAVDB 不返回总页数
+            "videos": results
+        }
     
     def get_video_detail(self, video_id: str) -> Optional[Dict[str, Any]]:
         """

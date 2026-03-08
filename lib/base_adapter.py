@@ -37,24 +37,30 @@ class BaseAdapter(ABC):
         pass
     
     @abstractmethod
-    def search_videos(self, keyword: str, max_pages: int = 1) -> List[Dict[str, Any]]:
+    def search_videos(self, keyword: str, page: int = 1, max_pages: int = 1) -> Dict[str, Any]:
         """
         搜索视频
         
         Args:
             keyword: 搜索关键词（番号、标题、演员等）
+            page: 起始页码（从1开始）
             max_pages: 最大搜索页数
             
         Returns:
-            视频列表，每个视频包含以下字段：
-            - video_id: 原始平台ID（字符串）
-            - code: 番号
-            - title: 标题
-            - date: 发布日期
-            - tags: 标签名称列表
-            - actors: 演员列表
-            - cover_url: 封面图片URL
-            - rating: 评分
+            {
+                'page': 当前页码,
+                'has_next': 是否有下一页,
+                'total_pages': 总页数（如果知道）,
+                'videos': 视频列表，每个视频包含以下字段：
+                    - video_id: 原始平台ID（字符串）
+                    - code: 番号
+                    - title: 标题
+                    - date: 发布日期
+                    - tags: 标签名称列表
+                    - actors: 演员列表
+                    - cover_url: 封面图片URL
+                    - rating: 评分
+            }
         """
         pass
     

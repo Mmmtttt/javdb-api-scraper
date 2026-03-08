@@ -1161,7 +1161,7 @@ class JavdbAPI:
     
     # ==================== 搜索功能 ====================
     
-    def search_videos(self, keyword: str, page: int = 1) -> List[Dict]:
+    def search_videos(self, keyword: str, page: int = 1) -> Dict:
         """
         搜索视频
         
@@ -1170,7 +1170,12 @@ class JavdbAPI:
             page: 页码
             
         Returns:
-            视频列表
+            {
+                'page': 当前页码,
+                'has_next': 是否有下一页,
+                'total_pages': 总页数（如果知道）,
+                'videos': 视频列表
+            }
         """
         encoded_keyword = quote(keyword)
         url = f"/search?q={encoded_keyword}&page={page}"
@@ -1189,7 +1194,16 @@ class JavdbAPI:
             except:
                 continue
         
-        return videos
+        # 检查是否有下一页
+        next_btn = soup.select_one('nav.pagination a[rel="next"]')
+        has_next = next_btn is not None
+        
+        return {
+            'page': page,
+            'has_next': has_next,
+            'total_pages': None,
+            'videos': videos
+        }
     
     # ==================== 批量保存功能 ====================
     
