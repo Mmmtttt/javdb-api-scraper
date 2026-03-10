@@ -300,6 +300,10 @@ class JavdbAPI:
         thumbnail_images = DataProcessor.extract_hd_thumbnails(video_id, soup)
         preview_video = self._extract_preview_video(soup)
         
+        cover_url = ""
+        if thumbnail_images and len(thumbnail_images) > 0:
+            cover_url = thumbnail_images[0]
+        
         result = {
             'video_id': video_id,
             'title': title,
@@ -311,6 +315,7 @@ class JavdbAPI:
             'magnets': magnets,
             'thumbnail_images': thumbnail_images,
             'preview_video': preview_video,
+            'cover_url': cover_url,
             'url': response.url,
         }
         
