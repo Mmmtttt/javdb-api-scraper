@@ -93,20 +93,22 @@ class JavbusAdapter(BaseAdapter):
             print(f"解析电影项失败: {e}")
             return None
     
-    def search_videos(self, keyword: str, max_pages: int = 1, movie_type: str = None) -> List[Dict[str, Any]]:
+    def search_videos(self, keyword: str, page: int = 1, max_pages: int = 1, movie_type: str = None) -> Dict[str, Any]:
         """
         搜索视频
         
         Args:
             keyword: 搜索关键词（番号、标题等）
+            page: 起始页码
             max_pages: 最大搜索页数
             movie_type: 影片类型 'normal'(有码) 或 'uncensored'(无码)，None 表示全部
             
         Returns:
-            视频列表
+            包含分页信息和视频列表的字典
         """
         results = []
-        page = 1
+        current_page = page
+        has_next = True
         
         # 构建基础 URL
         if movie_type == self.TYPE_UNCENSORED:
@@ -114,13 +116,13 @@ class JavbusAdapter(BaseAdapter):
         else:
             base_url = f"{self.BASE_URL}/search"
         
-        while page <= max_pages:
+        while current_page < page + max_pages and has_next:
             try:
                 # 构建搜索 URL
-                if page == 1:
-                    url = f"{base_url}/{keyword}&type=1"
+                if current_page == 1:
+                    url = f"{base_url}/{keyword}?type=1"
                 else:
-                    url = f"{base_url}/{keyword}/{page}&type=1"
+                    url = f"{base_url}/{keyword}/{current_page}?type=1"
                 
                 response = self._get(url)
                 response.raise_for_status()
@@ -128,9 +130,10 @@ class JavbusAdapter(BaseAdapter):
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # 解析电影列表
-                items = soup.select('#waterfall #waterfall .item')
+                items = soup.select('#waterfall .item')
                 
                 if not items:
+                    has_next = False
                     break
                 
                 for item in items:
@@ -140,17 +143,25 @@ class JavbusAdapter(BaseAdapter):
                 
                 # 检查是否有下一页
                 next_btn = soup.select_one('.pagination li #next')
-                if not next_btn:
+                has_next = bool(next_btn)
+                
+                if has_next and current_page < page + max_pages - 1:
+                    current_page += 1
+                    time.sleep(0.5)
+                else:
                     break
                 
-                page += 1
-                time.sleep(0.5)  # 避免请求过快
-                
             except Exception as e:
-                print(f"搜索失败 (page {page}): {e}")
+                print(f"搜索失败 (page {current_page}): {e}")
+                has_next = False
                 break
         
-        return results
+        return {
+            "page": page,
+            "has_next": has_next,
+            "total_pages": None,
+            "videos": results
+        }
     
     def get_video_detail(self, video_id: str, movie_type: str = None) -> Optional[Dict[str, Any]]:
         """
