@@ -53,4 +53,7 @@ config_local.py
 config.py
 
 # 输出目录
-output/
+output/csv
+output/images
+output/json
+output/magnets
