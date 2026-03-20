@@ -50,7 +50,6 @@ temp_*.json
 # 配置文件（包含敏感信息）
 cookies.json
 config_local.py
-config.py
 
 # 输出目录
 output/csv
