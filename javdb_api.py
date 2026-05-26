@@ -362,7 +362,7 @@ class JavdbAPI:
     
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """提取标题"""
-        selectors = ['h1.title', '.video-title', 'h1', 'title']
+        selectors = ['h2.title', '.video-title', 'h2', 'title']
         for selector in selectors:
             elem = soup.select_one(selector)
             if elem:
