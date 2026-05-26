@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bs4 import BeautifulSoup
+import config
 from .base_adapter import BaseAdapter
 from .platform import Platform
 from javdb_api import JavdbAPI
@@ -368,7 +369,7 @@ class JavdbAdapter(BaseAdapter):
             
             for i, img_url in enumerate(thumbnail_images):
                 try:
-                    response = requests.get(img_url, timeout=30)
+                    response = requests.get(img_url, timeout=30, proxies=config.get_proxies())
                     if response.status_code == 200:
                         ext = img_url.split('.')[-1].split('?')[0] or 'jpg'
                         file_path = video_dir / f"{i:03d}.{ext}"

@@ -82,6 +82,9 @@ class JavdbAPI:
         self.domain_index = domain_index
         self.session = requests.Session()
         self.session.headers.update(config.HEADERS)
+        self.proxies = config.get_proxies()
+        if self.proxies:
+            self.session.proxies.update(self.proxies)
         
         self._load_cookies()
         
@@ -214,6 +217,8 @@ class JavdbAPI:
         url = self._get_full_url(path)
         kwargs.setdefault('timeout', config.JAVDB['timeout'])
         kwargs.setdefault('allow_redirects', True)
+        if self.proxies:
+            kwargs.setdefault('proxies', self.proxies)
         
         last_exception = None
         
