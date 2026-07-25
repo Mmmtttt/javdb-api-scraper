@@ -35,6 +35,12 @@
   "configuration": {
     "order": 40,
     "label": "JAVBUS",
+    "credential": {
+      "enabled_field": "enabled",
+      "required_fields": [],
+      "unconfigured_message": "",
+      "disabled_message": "JAVBUS 平台未启用，不能使用该平台查询。"
+    },
     "sections": []
   },
   "resource_policy": {
