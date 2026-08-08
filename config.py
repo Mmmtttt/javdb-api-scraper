@@ -64,6 +64,38 @@ HEADERS = {
     'Upgrade-Insecure-Requests': '1',
 }
 
+# 代理配置
+PROXY = {
+    'enabled': False,
+    'http': 'http://127.0.0.1:7890',
+    'https': 'http://127.0.0.1:7890',
+}
+
+
+def get_proxies():
+    """Return requests proxy config when proxy is enabled."""
+    if not PROXY.get('enabled'):
+        return None
+
+    http_proxy = (PROXY.get('http') or '').strip()
+    https_proxy = (PROXY.get('https') or '').strip()
+
+    proxies = {}
+    if http_proxy:
+        proxies['http'] = http_proxy
+    if https_proxy:
+        proxies['https'] = https_proxy
+
+    if not proxies:
+        return None
+
+    if 'http' not in proxies and 'https' in proxies:
+        proxies['http'] = proxies['https']
+    if 'https' not in proxies and 'http' in proxies:
+        proxies['https'] = proxies['http']
+
+    return proxies
+
 # Cookie 文件
 COOKIE_FILE = 'cookies.json'
 

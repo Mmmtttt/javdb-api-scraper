@@ -26,6 +26,9 @@ class JavdbLogin:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update(config.HEADERS)
+        self.proxies = config.get_proxies()
+        if self.proxies:
+            self.session.proxies.update(self.proxies)
         self.base_url = f"https://{config.JAVDB['domains'][0]}"
     
     def login(self, username: str = None, password: str = None) -> bool:

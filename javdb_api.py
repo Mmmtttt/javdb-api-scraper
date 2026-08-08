@@ -82,6 +82,9 @@ class JavdbAPI:
         self.domain_index = self.normalize_domain_index(domain_index)
         self.session = requests.Session()
         self.session.headers.update(config.HEADERS)
+        self.proxies = config.get_proxies()
+        if self.proxies:
+            self.session.proxies.update(self.proxies)
         
         self._load_cookies()
         
@@ -245,6 +248,8 @@ class JavdbAPI:
         url = self._get_full_url(path)
         kwargs.setdefault('timeout', config.JAVDB['timeout'])
         kwargs.setdefault('allow_redirects', True)
+        if self.proxies:
+            kwargs.setdefault('proxies', self.proxies)
         
         last_exception = None
         
@@ -391,7 +396,7 @@ class JavdbAPI:
     
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """提取标题"""
-        selectors = ['h1.title', '.video-title', 'h1', 'title']
+        selectors = ['h2.title', '.video-title', 'h2', 'title']
         for selector in selectors:
             elem = soup.select_one(selector)
             if elem:
