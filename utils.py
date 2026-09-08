@@ -10,12 +10,30 @@ from typing import List, Dict, Any
 from curl_cffi import requests
 from bs4 import BeautifulSoup
 
+try:
+    import config as _javdb_config
+except Exception:
+    _javdb_config = None
+
+
+def _resolve_output_path(output_dir: str) -> Path:
+    path = Path(output_dir)
+    if path.is_absolute():
+        return path
+
+    parts = path.parts
+    if parts and parts[0] == "output" and _javdb_config is not None:
+        output_root = getattr(_javdb_config, "OUTPUT_ROOT", None)
+        if output_root is not None:
+            return Path(output_root).joinpath(*parts[1:])
+    return path
+
 
 class JSONExporter:
     """JSON 数据导出器"""
     
     def __init__(self, output_dir: str = "output/json"):
-        self.output_dir = Path(output_dir)
+        self.output_dir = _resolve_output_path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
     def save_actor_works(self, actor_name: str, actor_id: str, 
@@ -63,7 +81,7 @@ class ImageDownloader:
             image_urls: 图片URL列表
             output_dir: 输出目录
         """
-        video_dir = Path(output_dir) / code
+        video_dir = _resolve_output_path(output_dir) / code
         video_dir.mkdir(parents=True, exist_ok=True)
         
         for i, url in enumerate(image_urls):
@@ -104,7 +122,7 @@ class ImageDownloader:
                 'files': [下载的文件路径列表]
             }
         """
-        video_dir = Path(output_dir) / video_id
+        video_dir = _resolve_output_path(output_dir) / video_id
         video_dir.mkdir(parents=True, exist_ok=True)
         
         downloaded = 0
@@ -151,7 +169,7 @@ class MagnetExporter:
     """磁力链接导出器"""
     
     def __init__(self, output_dir: str = "output/magnets"):
-        self.output_dir = Path(output_dir)
+        self.output_dir = _resolve_output_path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
     def save_magnets(self, works: List[Dict], filename: str):

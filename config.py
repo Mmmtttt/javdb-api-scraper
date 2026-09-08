@@ -4,18 +4,43 @@ JAVDB API 配置文件示例
 """
 
 import os
+import tempfile
 from pathlib import Path
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent
 
+
+def _is_android_runtime() -> bool:
+    return (
+        str(os.environ.get('BACKEND_RUNTIME_PROFILE') or '').strip().lower() == 'android'
+        or bool(str(os.environ.get('ANDROID_APP_FILES_DIR') or '').strip())
+    )
+
+
+def _resolve_output_root() -> Path:
+    override = str(os.environ.get('JAVDB_OUTPUT_ROOT') or '').strip()
+    if override:
+        return Path(override).expanduser()
+
+    if _is_android_runtime():
+        base = str(os.environ.get('ANDROID_APP_FILES_DIR') or '').strip()
+        if not base:
+            base = tempfile.gettempdir()
+        return Path(base) / 'third_party_runtime' / 'javdb' / 'output'
+
+    return PROJECT_ROOT / 'output'
+
+
+OUTPUT_ROOT = _resolve_output_root()
+
 # 输出目录配置
 OUTPUT_DIR = {
-    'root': PROJECT_ROOT / 'output',
-    'csv': PROJECT_ROOT / 'output' / 'csv',
-    'json': PROJECT_ROOT / 'output' / 'json',
-    'images': PROJECT_ROOT / 'output' / 'images',
-    'magnets': PROJECT_ROOT / 'output' / 'magnets',
+    'root': OUTPUT_ROOT,
+    'csv': OUTPUT_ROOT / 'csv',
+    'json': OUTPUT_ROOT / 'json',
+    'images': OUTPUT_ROOT / 'images',
+    'magnets': OUTPUT_ROOT / 'magnets',
 }
 
 # 确保输出目录存在
