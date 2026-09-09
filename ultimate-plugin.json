@@ -37,6 +37,8 @@
     { "key": "collection.detail" },
     { "key": "taxonomy.tags" },
     { "key": "taxonomy.tag_search" },
+    { "key": "playback.proxy.url" },
+    { "key": "transport.http.request" },
     { "key": "health.query.status" }
   ],
   "configuration": {

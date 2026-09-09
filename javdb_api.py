@@ -546,12 +546,35 @@ class JavdbAPI:
                     if not src:
                         continue
                     if src.startswith('//'):
-                        return f'https:{src}'
+                        return self._resolve_preview_video_url(f'https:{src}')
                     if src.startswith('/'):
-                        return urljoin(self.base_url, src)
-                    return src
+                        return self._resolve_preview_video_url(urljoin(self.base_url, src))
+                    return self._resolve_preview_video_url(src)
 
         return ""
+
+    def _resolve_preview_video_url(self, preview_url: str) -> str:
+        """Resolve JAVDB's preview_url endpoint to the final playable URL."""
+        normalized_url = str(preview_url or "").strip()
+        if not normalized_url:
+            return ""
+        if "/preview_url" not in normalized_url:
+            return normalized_url
+
+        try:
+            response = self.get(normalized_url)
+            payload = response.json()
+        except Exception:
+            return ""
+
+        resolved_url = str((payload or {}).get("url") or "").strip()
+        if not resolved_url:
+            return ""
+        if resolved_url.startswith("//"):
+            return f"https:{resolved_url}"
+        if resolved_url.startswith("/"):
+            return urljoin(self.base_url, resolved_url)
+        return resolved_url
     
     def _parse_size(self, size_text: str) -> float:
         """解析文件大小为 MB"""

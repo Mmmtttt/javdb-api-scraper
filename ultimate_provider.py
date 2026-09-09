@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import base64
 import os
 import re
 import sys
+from types import SimpleNamespace
 from typing import Any, Dict, List
+from urllib.parse import parse_qs, unquote, urljoin
 
 from bs4 import BeautifulSoup, FeatureNotFound
 
@@ -293,6 +296,18 @@ class _VideoProviderBase(ProtocolProvider):
 
 class JavdbProvider(_VideoProviderBase):
     PLATFORM_NAME = "javdb"
+    _PROXY_EXCLUDED_RESPONSE_HEADERS = {
+        "access-control-allow-credentials",
+        "access-control-allow-headers",
+        "access-control-allow-methods",
+        "access-control-allow-origin",
+        "access-control-expose-headers",
+        "access-control-max-age",
+        "content-encoding",
+        "content-length",
+        "transfer-encoding",
+        "connection",
+    }
 
     def normalize_config(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         normalized = super().normalize_config(payload)
@@ -311,6 +326,127 @@ class JavdbProvider(_VideoProviderBase):
         api = JavdbAPI(domain_index=domain_index)
         self._apply_config_cookies(api, config)
         return api
+
+    @classmethod
+    def _filter_proxy_headers(cls, headers) -> List[tuple]:
+        iterator = headers.items() if hasattr(headers, "items") else (headers or [])
+        return [
+            (name, value)
+            for name, value in iterator
+            if str(name).lower() not in cls._PROXY_EXCLUDED_RESPONSE_HEADERS
+        ]
+
+    @staticmethod
+    def _resolve_proxy_url(method: str, query_string: str, body_url: str) -> str:
+        if str(method or "GET").upper() == "POST":
+            return str(body_url or "").strip()
+
+        query = parse_qs(str(query_string or ""), keep_blank_values=True)
+        raw_url = str((query.get("url") or [""])[0] or "").strip()
+        if not raw_url:
+            return ""
+        try:
+            return base64.b64decode(raw_url).decode("utf-8")
+        except Exception:
+            return unquote(raw_url)
+
+    @staticmethod
+    def _rewrite_m3u8(m3u8_content: str, base_url: str, proxy_base_path: str) -> str:
+        def build_proxy_url(raw_url: str) -> str:
+            candidate = str(raw_url or "").strip()
+            if not candidate or candidate.startswith("#"):
+                return candidate
+            lowered = candidate.lower()
+            if lowered.startswith("/api/v1/video/proxy2") or lowered.startswith("/v1/video/proxy2"):
+                return candidate
+            absolute_url = candidate if candidate.startswith(("http://", "https://")) else urljoin(base_url, candidate)
+            encoded = base64.b64encode(absolute_url.encode("utf-8")).decode("utf-8")
+            return f"{proxy_base_path}/proxy2?url={encoded}"
+
+        def replace_key(match: re.Match) -> str:
+            key_uri = match.group(1)
+            return match.group(0).replace(key_uri, build_proxy_url(key_uri), 1)
+
+        rewritten = re.sub(r'URI="([^"]+)"', replace_key, str(m3u8_content or ""))
+        lines = []
+        for line in rewritten.splitlines():
+            stripped = line.strip()
+            lines.append(build_proxy_url(stripped) if stripped and not stripped.startswith("#") else line)
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_proxy_headers(api: JavdbAPI, incoming_headers: Dict[str, Any] = None) -> Dict[str, str]:
+        headers = dict(getattr(api.session, "headers", {}) or {})
+        headers.update({
+            "Referer": f"{api.base_url}/",
+            "Origin": api.base_url,
+        })
+        for key, value in dict(incoming_headers or {}).items():
+            header_key = str(key or "").strip()
+            header_value = str(value or "").strip()
+            if header_key and header_value:
+                headers[header_key] = header_value
+        return headers
+
+    def _proxy_url(self, params: Dict[str, Any], config: Dict[str, Any]):
+        api = self._get_collection_api(config)
+        method = str(params.get("method") or "GET").upper()
+        target_url = self._resolve_proxy_url(
+            method,
+            str(params.get("query_string") or ""),
+            str(params.get("body_url") or ""),
+        )
+        if not target_url:
+            raise ValueError("Missing url parameter")
+        if not target_url.startswith(("http://", "https://")):
+            target_url = f"https://{target_url}"
+
+        is_m3u8_url = "m3u8" in target_url.lower()
+        response = api.session.request(
+            method,
+            target_url,
+            headers=self._build_proxy_headers(api, params.get("incoming_headers") or {}),
+            stream=method != "HEAD" and not is_m3u8_url,
+            timeout=int((config or {}).get("timeout") or 30),
+            allow_redirects=True,
+        )
+        if method == "HEAD":
+            response.close()
+            return SimpleNamespace(status_code=response.status_code, headers=self._filter_proxy_headers(response.headers), content=b"")
+
+        content_type = str(response.headers.get("content-type") or response.headers.get("Content-Type") or "").lower()
+        if "mpegurl" not in content_type and not is_m3u8_url:
+            return response
+
+        content = response.content
+        try:
+            text = content.decode("utf-8", errors="replace")
+            if "#EXTM3U" in text:
+                text = text[text.find("#EXTM3U"):]
+                content = self._rewrite_m3u8(
+                    text,
+                    response.url or target_url,
+                    str(params.get("proxy_base_path") or "/api/v1/video").strip() or "/api/v1/video",
+                ).encode("utf-8")
+        finally:
+            response.close()
+
+        return SimpleNamespace(
+            status_code=response.status_code,
+            headers=self._filter_proxy_headers(response.headers),
+            content=content,
+        )
+
+    def _transport_request(self, params: Dict[str, Any], config: Dict[str, Any]):
+        api = self._get_collection_api(config)
+        return api.session.request(
+            str(params.get("method") or "GET").upper(),
+            str(params.get("url") or ""),
+            headers=self._build_proxy_headers(api, params.get("headers") or {}),
+            stream=bool(params.get("stream", False)),
+            timeout=int(params.get("timeout") or (config or {}).get("timeout") or 30),
+            allow_redirects=bool(params.get("allow_redirects", True)),
+        )
 
     def _get_adapter(self, config: Dict[str, Any], *args, **kwargs):
         status = self.get_query_status(config)
@@ -501,6 +637,10 @@ class JavdbProvider(_VideoProviderBase):
                 "invalid_tag_ids": invalid_tag_ids,
                 "overridden_tag_ids": overridden_tag_ids,
             }
+        if capability == "playback.proxy.url":
+            return self._proxy_url(params, config)
+        if capability == "transport.http.request":
+            return self._transport_request(params, config)
         if capability == "health.query.status":
             return self._build_health_status_payload(config)
         raise ValueError(f"unsupported capability: {capability}")
