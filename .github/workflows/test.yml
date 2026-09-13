@@ -19,4 +19,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest
       - name: Run deterministic tests
-        run: python -m pytest test/test_preview_video_url.py -q
+        run: >-
+          python -m pytest
+          test/test_preview_video_url.py
+          test/test_provider_contract.py
+          test/test_provider_legacy_scenarios.py
+          -q
